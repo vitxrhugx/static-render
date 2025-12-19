@@ -1,38 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
-import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
+import { DashboardSidebar, Location } from "@/components/dashboard/DashboardSidebar";
 import { WeatherCards } from "@/components/dashboard/WeatherCards";
 import { TemperatureChart } from "@/components/dashboard/TemperatureChart";
 import { PrecipitationChart } from "@/components/dashboard/PrecipitationChart";
 import { WindChart } from "@/components/dashboard/WindChart";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Upload, FileSpreadsheet } from "lucide-react";
+import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { getHistoricalWeather, formatChartData, getD1Data } from "@/lib/openmeteo";
 
-interface Location {
-  id: string;
-  name: string;
-  state: string;
-  latitude: number;
-  longitude: number;
+interface WeatherData {
+  tempMax: number;
+  tempMin: number;
+  precipitation: number;
+  windMax: number;
 }
 
-// Demo data
-const weatherData = {
-  tempMax: 32,
-  tempMin: 21,
-  precipitation: 12.4,
-  windMax: 28,
-};
-
-const chartData = [
-  { date: "11/12", tempMax: 30, tempMin: 19, precipitation: 0, windMax: 15 },
-  { date: "12/12", tempMax: 31, tempMin: 20, precipitation: 2.5, windMax: 18 },
-  { date: "13/12", tempMax: 28, tempMin: 18, precipitation: 15.2, windMax: 32 },
-  { date: "14/12", tempMax: 27, tempMin: 19, precipitation: 8.1, windMax: 25 },
-  { date: "15/12", tempMax: 29, tempMin: 20, precipitation: 0.5, windMax: 12 },
-  { date: "16/12", tempMax: 31, tempMin: 21, precipitation: 0, windMax: 14 },
-  { date: "17/12", tempMax: 32, tempMin: 21, precipitation: 12.4, windMax: 28 },
-];
+interface ChartDataPoint {
+  date: string;
+  tempMax: number;
+  tempMin: number;
+  precipitation: number;
+  windMax: number;
+}
 
 export default function Dashboard() {
   const [selectedLocation, setSelectedLocation] = useState<Location | null>({
@@ -42,6 +32,41 @@ export default function Dashboard() {
     latitude: -23.5475,
     longitude: -46.6361,
   });
+
+  const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+  const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch weather data when location changes
+  useEffect(() => {
+    async function fetchWeatherData() {
+      if (!selectedLocation) {
+        setWeatherData(null);
+        setChartData([]);
+        return;
+      }
+
+      setIsLoading(true);
+      setError(null);
+
+      const weather = await getHistoricalWeather(
+        selectedLocation.latitude,
+        selectedLocation.longitude
+      );
+
+      if (weather) {
+        setWeatherData(getD1Data(weather));
+        setChartData(formatChartData(weather));
+      } else {
+        setError("Não foi possível carregar os dados meteorológicos");
+      }
+
+      setIsLoading(false);
+    }
+
+    fetchWeatherData();
+  }, [selectedLocation]);
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -66,7 +91,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                   <h1 className="text-2xl md:text-3xl font-display font-bold">
-                    {selectedLocation.name}, {selectedLocation.state}
+                    {selectedLocation.name}{selectedLocation.state ? `, ${selectedLocation.state}` : ''}
                   </h1>
                 </div>
                 <div className="flex items-center gap-2">
@@ -77,22 +102,42 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* D-1 Cards */}
-              <div>
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-                  Dados D-1 (Ontem)
-                </h2>
-                <WeatherCards data={weatherData} />
-              </div>
+              {/* Loading State */}
+              {isLoading && (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="ml-3 text-muted-foreground">Carregando dados...</span>
+                </div>
+              )}
 
-              {/* Charts Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <TemperatureChart data={chartData} />
-                <PrecipitationChart data={chartData} />
-              </div>
+              {/* Error State */}
+              {error && !isLoading && (
+                <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 text-center">
+                  <p className="text-destructive">{error}</p>
+                </div>
+              )}
 
-              {/* Wind Chart */}
-              <WindChart data={chartData} />
+              {/* Weather Data */}
+              {!isLoading && !error && weatherData && (
+                <>
+                  {/* D-1 Cards */}
+                  <div>
+                    <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                      Dados D-1 (Ontem)
+                    </h2>
+                    <WeatherCards data={weatherData} />
+                  </div>
+
+                  {/* Charts Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <TemperatureChart data={chartData} />
+                    <PrecipitationChart data={chartData} />
+                  </div>
+
+                  {/* Wind Chart */}
+                  <WindChart data={chartData} />
+                </>
+              )}
 
               {/* Operational Data Section */}
               <div className="bg-card rounded-xl p-6 shadow-card">

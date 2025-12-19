@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Star, X } from "lucide-react";
+import { Search, MapPin, Star, X, Loader2 } from "lucide-react";
+import { useDebounce } from "@/hooks/use-debounce";
+import { searchLocations, GeocodingResult } from "@/lib/openmeteo";
 
-interface Location {
+export interface Location {
   id: string;
   name: string;
   state: string;
@@ -16,31 +18,58 @@ interface DashboardSidebarProps {
   onSelectLocation: (location: Location) => void;
 }
 
+// Demo saved locations (would come from database in production)
 const savedLocations: Location[] = [
   { id: "1", name: "São Paulo", state: "SP", latitude: -23.5475, longitude: -46.6361 },
   { id: "2", name: "Rio de Janeiro", state: "RJ", latitude: -22.9068, longitude: -43.1729 },
   { id: "3", name: "Belo Horizonte", state: "MG", latitude: -19.9167, longitude: -43.9345 },
 ];
 
-const searchResults: Location[] = [
-  { id: "4", name: "Curitiba", state: "PR", latitude: -25.4284, longitude: -49.2733 },
-  { id: "5", name: "Porto Alegre", state: "RS", latitude: -30.0346, longitude: -51.2177 },
-  { id: "6", name: "Salvador", state: "BA", latitude: -12.9714, longitude: -38.5014 },
-];
-
 export function DashboardSidebar({ selectedLocation, onSelectLocation }: DashboardSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<GeocodingResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    setShowResults(query.length >= 2);
-  };
+  const debouncedQuery = useDebounce(searchQuery, 500);
 
-  const handleSelectFromSearch = (location: Location) => {
+  // Fetch search results when debounced query changes
+  useEffect(() => {
+    async function fetchResults() {
+      if (debouncedQuery.length < 2) {
+        setSearchResults([]);
+        setShowResults(false);
+        return;
+      }
+
+      setIsSearching(true);
+      const results = await searchLocations(debouncedQuery);
+      setSearchResults(results);
+      setShowResults(results.length > 0);
+      setIsSearching(false);
+    }
+
+    fetchResults();
+  }, [debouncedQuery]);
+
+  const handleSelectFromSearch = (result: GeocodingResult) => {
+    const location: Location = {
+      id: result.id.toString(),
+      name: result.name,
+      state: result.admin1 || "",
+      latitude: result.latitude,
+      longitude: result.longitude,
+    };
     onSelectLocation(location);
     setSearchQuery("");
     setShowResults(false);
+    setSearchResults([]);
+  };
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setShowResults(false);
+    setSearchResults([]);
   };
 
   return (
@@ -52,35 +81,48 @@ export function DashboardSidebar({ selectedLocation, onSelectLocation }: Dashboa
           <Input
             placeholder="Buscar localidade..."
             value={searchQuery}
-            onChange={(e) => handleSearch(e.target.value)}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 pr-8"
           />
           {searchQuery && (
             <button
-              onClick={() => { setSearchQuery(""); setShowResults(false); }}
+              onClick={clearSearch}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
-              <X className="w-4 h-4" />
+              {isSearching ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <X className="w-4 h-4" />
+              )}
             </button>
           )}
         </div>
 
         {/* Search Results Dropdown */}
-        {showResults && (
-          <div className="absolute z-10 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden animate-fade-in">
-            {searchResults.map((location) => (
+        {showResults && searchResults.length > 0 && (
+          <div className="absolute z-50 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg overflow-hidden animate-fade-in">
+            {searchResults.map((result) => (
               <button
-                key={location.id}
-                onClick={() => handleSelectFromSearch(location)}
+                key={result.id}
+                onClick={() => handleSelectFromSearch(result)}
                 className="w-full px-4 py-3 text-left hover:bg-muted flex items-center gap-3 transition-colors"
               >
-                <MapPin className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium text-sm">{location.name}</p>
-                  <p className="text-xs text-muted-foreground">{location.state}, Brasil</p>
+                <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="font-medium text-sm truncate">{result.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {result.admin1 ? `${result.admin1}, ` : ""}Brasil
+                  </p>
                 </div>
               </button>
             ))}
+          </div>
+        )}
+
+        {/* No results message */}
+        {showResults && searchResults.length === 0 && !isSearching && debouncedQuery.length >= 2 && (
+          <div className="absolute z-50 mt-2 w-56 bg-card border border-border rounded-lg shadow-lg p-4 text-center">
+            <p className="text-sm text-muted-foreground">Nenhuma localidade encontrada</p>
           </div>
         )}
       </div>
