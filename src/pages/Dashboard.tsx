@@ -5,6 +5,7 @@ import { WeatherCards } from "@/components/dashboard/WeatherCards";
 import { TemperatureChart } from "@/components/dashboard/TemperatureChart";
 import { PrecipitationChart } from "@/components/dashboard/PrecipitationChart";
 import { WindChart } from "@/components/dashboard/WindChart";
+import { OperationsMap } from "@/components/dashboard/OperationsMap";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data } from "@/lib/openmeteo";
@@ -127,6 +128,9 @@ export default function Dashboard() {
                     </h2>
                     <WeatherCards data={weatherData} />
                   </div>
+
+                  {/* Operations Map */}
+                  <OperationsMap selectedLocation={selectedLocation} />
 
                   {/* Charts Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
