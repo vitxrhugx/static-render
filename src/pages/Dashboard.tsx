@@ -6,6 +6,7 @@ import { TemperatureChart } from "@/components/dashboard/TemperatureChart";
 import { PrecipitationChart } from "@/components/dashboard/PrecipitationChart";
 import { WindChart } from "@/components/dashboard/WindChart";
 import { OperationsMap } from "@/components/dashboard/OperationsMap";
+import { ExecutiveKPIs } from "@/components/dashboard/ExecutiveKPIs";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data } from "@/lib/openmeteo";
@@ -121,6 +122,9 @@ export default function Dashboard() {
               {/* Weather Data */}
               {!isLoading && !error && weatherData && (
                 <>
+                  {/* Executive KPIs */}
+                  <ExecutiveKPIs />
+
                   {/* D-1 Cards */}
                   <div>
                     <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
