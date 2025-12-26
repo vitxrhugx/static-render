@@ -9,6 +9,7 @@ import { OperationsMap } from "@/components/dashboard/OperationsMap";
 import { ExecutiveKPIs } from "@/components/dashboard/ExecutiveKPIs";
 import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
+import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
@@ -131,6 +132,9 @@ export default function Dashboard() {
               {/* Weather Data */}
               {!isLoading && !error && weatherData && (
                 <>
+                  {/* Weather Alerts */}
+                  <WeatherAlerts forecastData={forecastData} />
+
                   {/* Executive KPIs */}
                   <ExecutiveKPIs />
 
