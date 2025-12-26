@@ -11,7 +11,7 @@ import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
-import { getHistoricalWeather, formatChartData, getD1Data } from "@/lib/openmeteo";
+import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
 
 interface WeatherData {
   tempMax: number;
@@ -39,7 +39,9 @@ export default function Dashboard() {
 
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
+  const [forecastData, setForecastData] = useState<ForecastDay[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Fetch weather data when location changes
@@ -48,16 +50,19 @@ export default function Dashboard() {
       if (!selectedLocation) {
         setWeatherData(null);
         setChartData([]);
+        setForecastData(null);
         return;
       }
 
       setIsLoading(true);
+      setIsForecastLoading(true);
       setError(null);
 
-      const weather = await getHistoricalWeather(
-        selectedLocation.latitude,
-        selectedLocation.longitude
-      );
+      // Fetch historical and forecast data in parallel
+      const [weather, forecast] = await Promise.all([
+        getHistoricalWeather(selectedLocation.latitude, selectedLocation.longitude),
+        getWeatherForecast(selectedLocation.latitude, selectedLocation.longitude),
+      ]);
 
       if (weather) {
         setWeatherData(getD1Data(weather));
@@ -66,7 +71,9 @@ export default function Dashboard() {
         setError("Não foi possível carregar os dados meteorológicos");
       }
 
+      setForecastData(forecast);
       setIsLoading(false);
+      setIsForecastLoading(false);
     }
 
     fetchWeatherData();
@@ -136,7 +143,7 @@ export default function Dashboard() {
                   </div>
 
                   {/* Weather Forecast D+1 to D+7 */}
-                  <WeatherForecast />
+                  <WeatherForecast data={forecastData} isLoading={isForecastLoading} />
 
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />

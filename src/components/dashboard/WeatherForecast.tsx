@@ -1,56 +1,23 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   Sun, 
   Cloud, 
   CloudRain, 
   CloudSun, 
   CloudDrizzle,
-  Thermometer,
   Droplets,
   Wind
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, addDays } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-interface ForecastDay {
-  date: Date;
-  tempMax: number;
-  tempMin: number;
-  precipitation: number;
-  precipitationProbability: number;
-  windMax: number;
-  condition: "sunny" | "partly-cloudy" | "cloudy" | "drizzle" | "rain";
-}
+import { ForecastDay } from "@/lib/openmeteo";
 
 interface WeatherForecastProps {
-  data?: ForecastDay[];
+  data?: ForecastDay[] | null;
+  isLoading?: boolean;
 }
-
-// Generate demo forecast data
-function generateDemoForecast(): ForecastDay[] {
-  const conditions: ForecastDay["condition"][] = ["sunny", "partly-cloudy", "cloudy", "drizzle", "rain"];
-  const forecast: ForecastDay[] = [];
-  
-  for (let i = 1; i <= 7; i++) {
-    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-    const isRainy = condition === "rain" || condition === "drizzle";
-    
-    forecast.push({
-      date: addDays(new Date(), i),
-      tempMax: Math.round(25 + Math.random() * 10),
-      tempMin: Math.round(15 + Math.random() * 8),
-      precipitation: isRainy ? Math.round(Math.random() * 30 + 5) : Math.round(Math.random() * 3),
-      precipitationProbability: isRainy ? Math.round(60 + Math.random() * 40) : Math.round(Math.random() * 30),
-      windMax: Math.round(10 + Math.random() * 25),
-      condition,
-    });
-  }
-  
-  return forecast;
-}
-
-const defaultData = generateDemoForecast();
 
 function getConditionIcon(condition: ForecastDay["condition"]) {
   switch (condition) {
@@ -166,16 +133,39 @@ function ForecastCard({ day, isFirst }: ForecastCardProps) {
   );
 }
 
-export function WeatherForecast({ data = defaultData }: WeatherForecastProps) {
+function ForecastCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="text-center space-y-3">
+          <div>
+            <Skeleton className="h-4 w-12 mx-auto mb-1" />
+            <Skeleton className="h-3 w-10 mx-auto" />
+          </div>
+          <Skeleton className="h-8 w-8 mx-auto rounded-full" />
+          <Skeleton className="h-3 w-16 mx-auto" />
+          <Skeleton className="h-5 w-14 mx-auto" />
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-20 mx-auto" />
+            <Skeleton className="h-3 w-16 mx-auto" />
+          </div>
+          <Skeleton className="h-5 w-16 mx-auto rounded-full" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function WeatherForecast({ data, isLoading }: WeatherForecastProps) {
   // Count risk levels for summary
-  const riskCounts = data.reduce(
+  const riskCounts = data?.reduce(
     (acc, day) => {
       const risk = getRiskLevel(day.precipitationProbability, day.windMax);
       acc[risk.level]++;
       return acc;
     },
     { high: 0, medium: 0, low: 0 }
-  );
+  ) || { high: 0, medium: 0, low: 0 };
 
   return (
     <div className="space-y-4">
@@ -190,30 +180,42 @@ export function WeatherForecast({ data = defaultData }: WeatherForecastProps) {
         </div>
         
         {/* Risk Summary */}
-        <div className="flex items-center gap-3 text-xs">
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-success" />
-            <span className="text-muted-foreground">{riskCounts.low} favoráveis</span>
+        {data && data.length > 0 && (
+          <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-success" />
+              <span className="text-muted-foreground">{riskCounts.low} favoráveis</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-warning" />
+              <span className="text-muted-foreground">{riskCounts.medium} atenção</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 rounded-full bg-destructive" />
+              <span className="text-muted-foreground">{riskCounts.high} alto risco</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-warning" />
-            <span className="text-muted-foreground">{riskCounts.medium} atenção</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-destructive" />
-            <span className="text-muted-foreground">{riskCounts.high} alto risco</span>
-          </div>
-        </div>
+        )}
       </div>
       
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
-        {data.map((day, index) => (
-          <ForecastCard 
-            key={day.date.toISOString()} 
-            day={day} 
-            isFirst={index === 0}
-          />
-        ))}
+        {isLoading ? (
+          Array.from({ length: 7 }).map((_, index) => (
+            <ForecastCardSkeleton key={index} />
+          ))
+        ) : data && data.length > 0 ? (
+          data.map((day, index) => (
+            <ForecastCard 
+              key={day.date.toISOString()} 
+              day={day} 
+              isFirst={index === 0}
+            />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-8 text-muted-foreground">
+            <p className="text-sm">Não foi possível carregar a previsão</p>
+          </div>
+        )}
       </div>
     </div>
   );
