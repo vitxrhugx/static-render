@@ -8,6 +8,7 @@ import { WindChart } from "@/components/dashboard/WindChart";
 import { OperationsMap } from "@/components/dashboard/OperationsMap";
 import { ExecutiveKPIs } from "@/components/dashboard/ExecutiveKPIs";
 import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
+import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data } from "@/lib/openmeteo";
@@ -133,6 +134,9 @@ export default function Dashboard() {
                     </h2>
                     <WeatherCards data={weatherData} />
                   </div>
+
+                  {/* Weather Forecast D+1 to D+7 */}
+                  <WeatherForecast />
 
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
