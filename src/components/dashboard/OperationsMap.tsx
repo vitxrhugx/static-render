@@ -3,7 +3,8 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Droplets, Wind, Thermometer } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { MapPin, Droplets, Wind, Thermometer, Layers } from 'lucide-react';
 
 // Fix for default marker icons in Leaflet with Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -216,7 +217,24 @@ const createCustomIcon = (status: OperationPoint['status']) => {
 export function OperationsMap({ operations = demoOperations, selectedLocation }: OperationsMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
+  const heatmapLayerRef = useRef<L.LayerGroup | null>(null);
   const [hoveredOperation, setHoveredOperation] = useState<OperationPoint | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+
+  // Function to get precipitation color based on intensity
+  const getPrecipitationColor = (precipitation: number): string => {
+    if (precipitation >= 20) return 'hsl(0, 84%, 60%)'; // Red - Heavy rain
+    if (precipitation >= 10) return 'hsl(25, 100%, 50%)'; // Orange - Moderate rain
+    if (precipitation >= 5) return 'hsl(45, 100%, 50%)'; // Yellow - Light rain
+    if (precipitation >= 1) return 'hsl(180, 100%, 40%)'; // Cyan - Very light rain
+    return 'hsl(210, 100%, 50%)'; // Blue - No rain
+  };
+
+  // Function to get radius based on precipitation
+  const getPrecipitationRadius = (precipitation: number): number => {
+    const baseRadius = 80000; // 80km base
+    return baseRadius + (precipitation * 5000); // Increase radius with precipitation
+  };
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -243,12 +261,44 @@ export function OperationsMap({ operations = demoOperations, selectedLocation }:
     };
   }, []);
 
+  // Add heatmap layer
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Remove existing heatmap layer
+    if (heatmapLayerRef.current) {
+      heatmapLayerRef.current.clearLayers();
+    } else {
+      heatmapLayerRef.current = L.layerGroup().addTo(map);
+    }
+
+    if (showHeatmap) {
+      // Add precipitation circles for each operation
+      operations.forEach((op) => {
+        const color = getPrecipitationColor(op.weather.precipitation);
+        const radius = getPrecipitationRadius(op.weather.precipitation);
+        
+        const circle = L.circle([op.latitude, op.longitude], {
+          radius: radius,
+          fillColor: color,
+          fillOpacity: 0.25,
+          color: color,
+          weight: 1,
+          opacity: 0.4,
+        });
+
+        circle.addTo(heatmapLayerRef.current!);
+      });
+    }
+  }, [operations, showHeatmap]);
+
   // Add operation markers
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Clear existing markers
+    // Clear existing markers (but not heatmap layer)
     map.eachLayer((layer) => {
       if (layer instanceof L.Marker) {
         map.removeLayer(layer);
@@ -326,16 +376,27 @@ export function OperationsMap({ operations = demoOperations, selectedLocation }:
             <MapPin className="w-5 h-5 text-primary" />
             Mapa de Operações
           </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="bg-success/10 text-success border-success/20">
-              Normal: {operations.filter((op) => op.status === 'normal').length}
-            </Badge>
-            <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
-              Alerta: {alertCount}
-            </Badge>
-            <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
-              Crítico: {criticalCount}
-            </Badge>
+          <div className="flex items-center gap-3">
+            <Button
+              variant={showHeatmap ? "default" : "outline"}
+              size="sm"
+              onClick={() => setShowHeatmap(!showHeatmap)}
+              className="flex items-center gap-2"
+            >
+              <Layers className="w-4 h-4" />
+              Heatmap
+            </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="bg-success/10 text-success border-success/20">
+                Normal: {operations.filter((op) => op.status === 'normal').length}
+              </Badge>
+              <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                Alerta: {alertCount}
+              </Badge>
+              <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                Crítico: {criticalCount}
+              </Badge>
+            </div>
           </div>
         </div>
       </CardHeader>
@@ -404,17 +465,26 @@ export function OperationsMap({ operations = demoOperations, selectedLocation }:
               </div>
             </div>
             <div className="flex items-center gap-3 text-xs">
+              <span className="text-muted-foreground font-medium">Precipitação:</span>
               <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-success" />
-                <span>Normal</span>
+                <span className="w-3 h-3 rounded-full" style={{ background: 'hsl(210, 100%, 50%)' }} />
+                <span>0mm</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-warning" />
-                <span>Alerta</span>
+                <span className="w-3 h-3 rounded-full" style={{ background: 'hsl(180, 100%, 40%)' }} />
+                <span>1-5mm</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-full bg-destructive" />
-                <span>Crítico</span>
+                <span className="w-3 h-3 rounded-full" style={{ background: 'hsl(45, 100%, 50%)' }} />
+                <span>5-10mm</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full" style={{ background: 'hsl(25, 100%, 50%)' }} />
+                <span>10-20mm</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-full" style={{ background: 'hsl(0, 84%, 60%)' }} />
+                <span>&gt;20mm</span>
               </div>
             </div>
           </div>
