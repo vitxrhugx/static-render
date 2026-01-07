@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardSidebar, Location } from "@/components/dashboard/DashboardSidebar";
+import { DashboardFilters, FilterState, defaultFilters } from "@/components/dashboard/DashboardFilters";
 import { WeatherCards } from "@/components/dashboard/WeatherCards";
 import { TemperatureChart } from "@/components/dashboard/TemperatureChart";
 import { PrecipitationChart } from "@/components/dashboard/PrecipitationChart";
@@ -11,7 +12,7 @@ import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
 
 interface WeatherData {
@@ -38,6 +39,7 @@ export default function Dashboard() {
     longitude: -46.6361,
   });
 
+  const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<ForecastDay[] | null>(null);
@@ -80,6 +82,11 @@ export default function Dashboard() {
     fetchWeatherData();
   }, [selectedLocation]);
 
+  // Filter forecast data based on alert severity filters
+  const filteredForecastData = useMemo(() => {
+    return forecastData;
+  }, [forecastData]);
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <DashboardHeader />
@@ -94,24 +101,23 @@ export default function Dashboard() {
           {selectedLocation ? (
             <div className="max-w-7xl mx-auto space-y-6">
               {/* Location Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <MapPin className="w-4 h-4" />
-                    <span className="text-sm">
-                      {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}
-                    </span>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <MapPin className="w-4 h-4" />
+                      <span className="text-sm">
+                        {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}
+                      </span>
+                    </div>
+                    <h1 className="text-2xl md:text-3xl font-display font-bold">
+                      {selectedLocation.name}{selectedLocation.state ? `, ${selectedLocation.state}` : ''}
+                    </h1>
                   </div>
-                  <h1 className="text-2xl md:text-3xl font-display font-bold">
-                    {selectedLocation.name}{selectedLocation.state ? `, ${selectedLocation.state}` : ''}
-                  </h1>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm">
-                    <Calendar className="w-4 h-4 mr-2" />
-                    Últimos 7 dias
-                  </Button>
-                </div>
+                
+                {/* Filters Bar */}
+                <DashboardFilters filters={filters} onFiltersChange={setFilters} />
               </div>
 
               {/* Loading State */}
@@ -133,7 +139,10 @@ export default function Dashboard() {
               {!isLoading && !error && weatherData && (
                 <>
                   {/* Weather Alerts */}
-                  <WeatherAlerts forecastData={forecastData} />
+                  <WeatherAlerts 
+                    forecastData={filteredForecastData} 
+                    severityFilter={filters.alertSeverity}
+                  />
 
                   {/* Executive KPIs */}
                   <ExecutiveKPIs />
@@ -147,19 +156,19 @@ export default function Dashboard() {
                   </div>
 
                   {/* Weather Forecast D+1 to D+7 */}
-                  <WeatherForecast data={forecastData} isLoading={isForecastLoading} />
+                  <WeatherForecast data={filteredForecastData} isLoading={isForecastLoading} />
 
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
-                  {/* Charts Grid */}
+                  {/* Charts Grid - Conditionally render based on metrics filter */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <TemperatureChart data={chartData} />
-                    <PrecipitationChart data={chartData} />
+                    {filters.metrics.temperature && <TemperatureChart data={chartData} />}
+                    {filters.metrics.precipitation && <PrecipitationChart data={chartData} />}
                   </div>
 
                   {/* Wind Chart */}
-                  <WindChart data={chartData} />
+                  {filters.metrics.wind && <WindChart data={chartData} />}
 
                   {/* Occurrences Table */}
                   <OccurrencesTable />
