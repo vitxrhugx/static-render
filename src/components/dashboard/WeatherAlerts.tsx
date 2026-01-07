@@ -1,11 +1,12 @@
-import { AlertTriangle, CloudRain, Wind, ThermometerSun, X, Bell, ChevronRight } from "lucide-react";
+import { AlertTriangle, CloudRain, Wind, ThermometerSun, X, Bell, ChevronRight, BellRing, BellOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ForecastDay } from "@/lib/openmeteo";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
-
+import { useNotifications } from "@/hooks/use-notifications";
+import { useToast } from "@/hooks/use-toast";
 interface Alert {
   id: string;
   type: "rain" | "wind" | "heat" | "combined";
@@ -208,19 +209,89 @@ function AlertCard({ alert, onDismiss }: AlertCardProps) {
 
 export function WeatherAlerts({ forecastData }: WeatherAlertsProps) {
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const { isSupported, permission, requestPermission, sendNotification } = useNotifications();
+  const { toast } = useToast();
+  const sentNotificationsRef = useRef<Set<string>>(new Set());
   
+  const allAlerts = forecastData && forecastData.length > 0 ? analyzeForecasts(forecastData) : [];
+  const visibleAlerts = allAlerts.filter(alert => !dismissedAlerts.includes(alert.id));
+  const criticalAlerts = visibleAlerts.filter(a => a.severity === "critical");
+  
+  // Send browser notifications for critical alerts
+  useEffect(() => {
+    if (!notificationsEnabled || permission !== "granted") return;
+    
+    criticalAlerts.forEach(alert => {
+      if (!sentNotificationsRef.current.has(alert.id)) {
+        sendNotification({
+          title: alert.title,
+          body: alert.description,
+          tag: alert.id,
+        });
+        sentNotificationsRef.current.add(alert.id);
+      }
+    });
+  }, [criticalAlerts, notificationsEnabled, permission, sendNotification]);
+  
+  const handleToggleNotifications = async () => {
+    if (!isSupported) {
+      toast({
+        title: "Notificações não suportadas",
+        description: "Seu navegador não suporta notificações push.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (notificationsEnabled) {
+      setNotificationsEnabled(false);
+      toast({
+        title: "Notificações desativadas",
+        description: "Você não receberá mais alertas meteorológicos.",
+      });
+      return;
+    }
+    
+    if (permission === "granted") {
+      setNotificationsEnabled(true);
+      toast({
+        title: "Notificações ativadas",
+        description: "Você receberá alertas críticos automaticamente.",
+      });
+    } else if (permission === "denied") {
+      toast({
+        title: "Permissão negada",
+        description: "Habilite notificações nas configurações do navegador.",
+        variant: "destructive",
+      });
+    } else {
+      const granted = await requestPermission();
+      if (granted) {
+        setNotificationsEnabled(true);
+        toast({
+          title: "Notificações ativadas",
+          description: "Você receberá alertas críticos automaticamente.",
+        });
+      } else {
+        toast({
+          title: "Permissão negada",
+          description: "Você precisa permitir notificações para receber alertas.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
   if (!forecastData || forecastData.length === 0) {
     return null;
   }
-  
-  const allAlerts = analyzeForecasts(forecastData);
-  const visibleAlerts = allAlerts.filter(alert => !dismissedAlerts.includes(alert.id));
   
   if (visibleAlerts.length === 0) {
     return null;
   }
   
-  const criticalCount = visibleAlerts.filter(a => a.severity === "critical").length;
+  const criticalCount = criticalAlerts.length;
   const warningCount = visibleAlerts.filter(a => a.severity === "warning").length;
   
   const handleDismiss = (id: string) => {
@@ -253,16 +324,37 @@ export function WeatherAlerts({ forecastData }: WeatherAlertsProps) {
           </div>
         </div>
         
-        {visibleAlerts.length > 1 && (
+        <div className="flex items-center gap-2">
           <Button
-            variant="ghost"
+            variant={notificationsEnabled ? "default" : "outline"}
             size="sm"
-            className="text-xs text-muted-foreground"
-            onClick={handleDismissAll}
+            className="text-xs gap-1.5"
+            onClick={handleToggleNotifications}
           >
-            Dispensar todos
+            {notificationsEnabled ? (
+              <>
+                <BellRing className="w-3.5 h-3.5" />
+                Notificações ativas
+              </>
+            ) : (
+              <>
+                <BellOff className="w-3.5 h-3.5" />
+                Ativar notificações
+              </>
+            )}
           </Button>
-        )}
+          
+          {visibleAlerts.length > 1 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground"
+              onClick={handleDismissAll}
+            >
+              Dispensar todos
+            </Button>
+          )}
+        </div>
       </div>
       
       <div className="grid gap-3 md:grid-cols-2">
