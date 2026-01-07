@@ -17,8 +17,14 @@ interface Alert {
   icon: React.ReactNode;
 }
 
+interface SeverityFilter {
+  critical: boolean;
+  warning: boolean;
+}
+
 interface WeatherAlertsProps {
   forecastData?: ForecastDay[] | null;
+  severityFilter?: SeverityFilter;
 }
 
 function analyzeForecasts(data: ForecastDay[]): Alert[] {
@@ -207,7 +213,7 @@ function AlertCard({ alert, onDismiss }: AlertCardProps) {
   );
 }
 
-export function WeatherAlerts({ forecastData }: WeatherAlertsProps) {
+export function WeatherAlerts({ forecastData, severityFilter }: WeatherAlertsProps) {
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { isSupported, permission, requestPermission, sendNotification } = useNotifications();
@@ -215,7 +221,16 @@ export function WeatherAlerts({ forecastData }: WeatherAlertsProps) {
   const sentNotificationsRef = useRef<Set<string>>(new Set());
   
   const allAlerts = forecastData && forecastData.length > 0 ? analyzeForecasts(forecastData) : [];
-  const visibleAlerts = allAlerts.filter(alert => !dismissedAlerts.includes(alert.id));
+  
+  // Apply severity filter
+  const filteredBySeverity = allAlerts.filter(alert => {
+    if (!severityFilter) return true;
+    if (alert.severity === "critical" && !severityFilter.critical) return false;
+    if (alert.severity === "warning" && !severityFilter.warning) return false;
+    return true;
+  });
+  
+  const visibleAlerts = filteredBySeverity.filter(alert => !dismissedAlerts.includes(alert.id));
   const criticalAlerts = visibleAlerts.filter(a => a.severity === "critical");
   
   // Send browser notifications for critical alerts
