@@ -17,6 +17,7 @@ import { ForecastDay } from "@/lib/openmeteo";
 interface WeatherForecastProps {
   data?: ForecastDay[] | null;
   isLoading?: boolean;
+  showTitle?: boolean;
 }
 
 function getConditionIcon(condition: ForecastDay["condition"]) {
@@ -156,7 +157,7 @@ function ForecastCardSkeleton() {
   );
 }
 
-export function WeatherForecast({ data, isLoading }: WeatherForecastProps) {
+export function WeatherForecast({ data, isLoading, showTitle = true }: WeatherForecastProps) {
   // Count risk levels for summary
   const riskCounts = data?.reduce(
     (acc, day) => {
@@ -169,34 +170,36 @@ export function WeatherForecast({ data, isLoading }: WeatherForecastProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-            Previsão D+1 a D+7
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Previsão meteorológica para os próximos 7 dias
-          </p>
-        </div>
-        
-        {/* Risk Summary */}
-        {data && data.length > 0 && (
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-success" />
-              <span className="text-muted-foreground">{riskCounts.low} favoráveis</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-warning" />
-              <span className="text-muted-foreground">{riskCounts.medium} atenção</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-2 h-2 rounded-full bg-destructive" />
-              <span className="text-muted-foreground">{riskCounts.high} alto risco</span>
-            </div>
+      {showTitle && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Previsão D+1 a D+7
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Previsão meteorológica para os próximos 7 dias
+            </p>
           </div>
-        )}
-      </div>
+          
+          {/* Risk Summary */}
+          {data && data.length > 0 && (
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-success" />
+                <span className="text-muted-foreground">{riskCounts.low} favoráveis</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-warning" />
+                <span className="text-muted-foreground">{riskCounts.medium} atenção</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-2 h-2 rounded-full bg-destructive" />
+                <span className="text-muted-foreground">{riskCounts.high} alto risco</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {isLoading ? (

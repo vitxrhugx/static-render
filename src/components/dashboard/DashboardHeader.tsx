@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { CloudSun, Settings, LogOut, User } from "lucide-react";
+import { CloudSun, Settings, LogOut, User, Building2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,17 @@ export function DashboardHeader() {
 
       <div className="flex items-center gap-2">
         <span className="text-sm text-muted-foreground mr-2">Empresa Demo</span>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => navigate("/organization")}
+          className="hidden sm:flex"
+        >
+          <Building2 className="w-4 h-4 mr-2" />
+          Organização
+        </Button>
+
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
@@ -34,6 +45,10 @@ export function DashboardHeader() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onClick={() => navigate("/organization")}>
+              <Building2 className="w-4 h-4 mr-2" />
+              Minha Organização
+            </DropdownMenuItem>
             <DropdownMenuItem>
               <Settings className="w-4 h-4 mr-2" />
               Configurações
