@@ -14,7 +14,170 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      operational_data: {
+        Row: {
+          cancellation_reason: string | null
+          cancelled_operations: number
+          completed_operations: number
+          created_at: string
+          custom_data: Json | null
+          date: string
+          id: string
+          location_id: string | null
+          organization_id: string
+          scheduled_operations: number
+          weather_impact: boolean | null
+        }
+        Insert: {
+          cancellation_reason?: string | null
+          cancelled_operations?: number
+          completed_operations?: number
+          created_at?: string
+          custom_data?: Json | null
+          date: string
+          id?: string
+          location_id?: string | null
+          organization_id: string
+          scheduled_operations?: number
+          weather_impact?: boolean | null
+        }
+        Update: {
+          cancellation_reason?: string | null
+          cancelled_operations?: number
+          completed_operations?: number
+          created_at?: string
+          custom_data?: Json | null
+          date?: string
+          id?: string
+          location_id?: string | null
+          organization_id?: string
+          scheduled_operations?: number
+          weather_impact?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_data_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "organization_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_data_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_locations: {
+        Row: {
+          active: boolean
+          address: string | null
+          created_at: string
+          id: string
+          latitude: number
+          longitude: number
+          name: string
+          organization_id: string
+          type: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude: number
+          longitude: number
+          name: string
+          organization_id: string
+          type?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number
+          longitude?: number
+          name?: string
+          organization_id?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_locations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          cnpj: string | null
+          config: Json
+          created_at: string
+          id: string
+          logo: string | null
+          name: string
+          sector: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cnpj?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          logo?: string | null
+          name: string
+          sector?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cnpj?: string | null
+          config?: Json
+          created_at?: string
+          id?: string
+          logo?: string | null
+          name?: string
+          sector?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          email: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          email?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

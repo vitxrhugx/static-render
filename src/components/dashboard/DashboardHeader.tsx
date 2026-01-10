@@ -8,11 +8,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/use-auth";
 
 export function DashboardHeader() {
   const navigate = useNavigate();
+  const { signOut, user } = useAuth();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 
@@ -26,7 +29,7 @@ export function DashboardHeader() {
       </Link>
 
       <div className="flex items-center gap-2">
-        <span className="text-sm text-muted-foreground mr-2">Empresa Demo</span>
+        <span className="text-sm text-muted-foreground mr-2 hidden md:inline">{user?.email || 'Usuário'}</span>
         
         <Button 
           variant="ghost" 
