@@ -11,9 +11,11 @@ import { ExecutiveKPIs } from "@/components/dashboard/ExecutiveKPIs";
 import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
+import { WeatherCalendar } from "@/components/dashboard/WeatherCalendar";
 import { Button } from "@/components/ui/button";
-import { MapPin, Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface WeatherData {
   tempMax: number;
@@ -155,8 +157,35 @@ export default function Dashboard() {
                     <WeatherCards data={weatherData} />
                   </div>
 
-                  {/* Weather Forecast D+1 to D+7 */}
-                  <WeatherForecast data={filteredForecastData} isLoading={isForecastLoading} />
+                  {/* Forecast Section with Tabs */}
+                  <Tabs defaultValue="cards" className="w-full">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+                        Previsão D+1 a D+7
+                      </h2>
+                      <TabsList className="grid w-fit grid-cols-2">
+                        <TabsTrigger value="cards" className="flex items-center gap-2">
+                          <FileSpreadsheet className="w-4 h-4" />
+                          Cards
+                        </TabsTrigger>
+                        <TabsTrigger value="calendar" className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          Calendário
+                        </TabsTrigger>
+                      </TabsList>
+                    </div>
+                    
+                    <TabsContent value="cards" className="mt-0">
+                      <WeatherForecast data={filteredForecastData} isLoading={isForecastLoading} showTitle={false} />
+                    </TabsContent>
+                    
+                    <TabsContent value="calendar" className="mt-0">
+                      <WeatherCalendar 
+                        forecastData={filteredForecastData || []} 
+                        historicalData={chartData}
+                      />
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
