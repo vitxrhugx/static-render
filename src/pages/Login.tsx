@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { CloudSun, Mail, Lock, ArrowRight } from "lucide-react";
+import { CloudSun, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -13,21 +14,48 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { signIn, isAuthenticated, isLoading: authLoading } = useAuth();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate login - will be replaced with actual auth
-    setTimeout(() => {
-      setIsLoading(false);
+    const { error } = await signIn(email, password);
+    
+    if (error) {
       toast({
-        title: "Login realizado!",
-        description: "Redirecionando para o dashboard...",
+        title: "Erro ao entrar",
+        description: error.message === "Invalid login credentials" 
+          ? "Email ou senha incorretos"
+          : error.message,
+        variant: "destructive",
       });
-      navigate("/dashboard");
-    }, 1000);
+      setIsLoading(false);
+      return;
+    }
+
+    toast({
+      title: "Login realizado!",
+      description: "Redirecionando para o dashboard...",
+    });
+    navigate("/dashboard");
   };
+
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -67,6 +95,7 @@ export default function Login() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
                     required
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -82,19 +111,26 @@ export default function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
                     required
+                    disabled={isLoading}
                   />
                 </div>
               </div>
               <Button type="submit" className="w-full" variant="hero" disabled={isLoading}>
-                {isLoading ? "Entrando..." : "Entrar"}
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Entrando...
+                  </>
+                ) : (
+                  <>
+                    Entrar
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Link to="/forgot-password" className="text-sm text-primary hover:underline">
-              Esqueceu sua senha?
-            </Link>
             <div className="text-sm text-muted-foreground">
               Não tem uma conta?{" "}
               <Link to="/signup" className="text-primary hover:underline font-medium">
