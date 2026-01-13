@@ -47,6 +47,15 @@ export function useAuth() {
         emailRedirectTo: window.location.origin,
       },
     });
+
+    // Create profile after successful signup
+    if (data.user && !error) {
+      await supabase.from('profiles').insert({
+        user_id: data.user.id,
+        email,
+      });
+    }
+
     return { data, error };
   }, []);
 
