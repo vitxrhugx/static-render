@@ -74,12 +74,7 @@ export default function OrganizationSettings() {
     }
   }, [organization]);
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate("/login");
-    }
-  }, [authLoading, isAuthenticated, navigate]);
+  // Note: Authentication redirect is now handled by ProtectedRoute
 
   const handleSectorChange = (newSector: OrganizationSector) => {
     const preset = sectorPresets[newSector];
@@ -186,6 +181,12 @@ export default function OrganizationSettings() {
         const newOrg = await createOrganization(name, sector, cnpj || undefined);
         if (newOrg) {
           setHasChanges(false);
+          // Redirect to dashboard after creating organization
+          toast({
+            title: "Organização criada!",
+            description: "Agora adicione localidades para começar a monitorar o clima.",
+          });
+          navigate("/dashboard");
         }
       }
     } finally {
