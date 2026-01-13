@@ -1,15 +1,17 @@
-import { AlertTriangle, CloudRain, Wind, ThermometerSun, X, Bell, ChevronRight, BellRing, BellOff } from "lucide-react";
+import { AlertTriangle, CloudRain, Wind, ThermometerSun, Snowflake, X, Bell, ChevronRight, BellRing, BellOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ForecastDay } from "@/lib/openmeteo";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { useNotifications } from "@/hooks/use-notifications";
 import { useToast } from "@/hooks/use-toast";
+import { WeatherThresholds } from "@/types/organization";
+
 interface Alert {
   id: string;
-  type: "rain" | "wind" | "heat" | "combined";
+  type: "rain" | "wind" | "heat" | "cold" | "combined";
   severity: "warning" | "critical";
   title: string;
   description: string;
@@ -25,102 +27,162 @@ interface SeverityFilter {
 interface WeatherAlertsProps {
   forecastData?: ForecastDay[] | null;
   severityFilter?: SeverityFilter;
+  thresholds?: WeatherThresholds;
 }
 
-function analyzeForecasts(data: ForecastDay[]): Alert[] {
+// Default thresholds if not provided
+const defaultThresholds: WeatherThresholds = {
+  precipitation: { warning: 10, critical: 25 },
+  wind: { warning: 30, critical: 50 },
+  temperature: { min: 5, max: 40 },
+};
+
+function analyzeForecasts(data: ForecastDay[], thresholds: WeatherThresholds): Alert[] {
   const alerts: Alert[] = [];
   
-  // Check for high precipitation probability
-  const rainyDays = data.filter(day => day.precipitationProbability >= 70);
-  const moderateRainDays = data.filter(day => day.precipitationProbability >= 50 && day.precipitationProbability < 70);
+  // Check for precipitation based on organization thresholds
+  const criticalRainDays = data.filter(day => day.precipitation >= thresholds.precipitation.critical);
+  const warningRainDays = data.filter(day => 
+    day.precipitation >= thresholds.precipitation.warning && 
+    day.precipitation < thresholds.precipitation.critical
+  );
   
-  if (rainyDays.length > 0) {
+  // Also check probability for days without actual precipitation amount
+  const highProbabilityDays = data.filter(day => day.precipitationProbability >= 70 && day.precipitation < thresholds.precipitation.warning);
+  
+  if (criticalRainDays.length > 0) {
     alerts.push({
       id: "rain-critical",
       type: "rain",
       severity: "critical",
-      title: "Alerta de Chuva Intensa",
-      description: `${rainyDays.length} dia${rainyDays.length > 1 ? 's' : ''} com alta probabilidade de precipitação (≥70%). Risco de alagamentos e interrupções operacionais.`,
-      days: rainyDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
-      icon: <CloudRain className="w-5 h-5" />,
-    });
-  } else if (moderateRainDays.length >= 3) {
-    alerts.push({
-      id: "rain-warning",
-      type: "rain",
-      severity: "warning",
-      title: "Atenção: Chuvas Frequentes",
-      description: `${moderateRainDays.length} dias com chance moderada de chuva. Planeje atividades externas com cautela.`,
-      days: moderateRainDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      title: "Alerta de Chuva Crítica",
+      description: `${criticalRainDays.length} dia${criticalRainDays.length > 1 ? 's' : ''} com precipitação ≥${thresholds.precipitation.critical}mm. Operações externas em risco.`,
+      days: criticalRainDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <CloudRain className="w-5 h-5" />,
     });
   }
   
-  // Check for high wind speeds
-  const windyDays = data.filter(day => day.windMax >= 30);
-  const moderateWindDays = data.filter(day => day.windMax >= 20 && day.windMax < 30);
+  if (warningRainDays.length > 0 || highProbabilityDays.length >= 2) {
+    const affectedDays = [...warningRainDays, ...highProbabilityDays];
+    alerts.push({
+      id: "rain-warning",
+      type: "rain",
+      severity: "warning",
+      title: "Atenção: Chuvas Previstas",
+      description: `${affectedDays.length} dia${affectedDays.length > 1 ? 's' : ''} com chuva entre ${thresholds.precipitation.warning}-${thresholds.precipitation.critical}mm ou alta probabilidade.`,
+      days: [...new Set(affectedDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })))],
+      icon: <CloudRain className="w-5 h-5" />,
+    });
+  }
   
-  if (windyDays.length > 0) {
+  // Check for wind based on organization thresholds
+  const criticalWindDays = data.filter(day => day.windMax >= thresholds.wind.critical);
+  const warningWindDays = data.filter(day => 
+    day.windMax >= thresholds.wind.warning && 
+    day.windMax < thresholds.wind.critical
+  );
+  
+  if (criticalWindDays.length > 0) {
     alerts.push({
       id: "wind-critical",
       type: "wind",
       severity: "critical",
-      title: "Alerta de Ventos Fortes",
-      description: `${windyDays.length} dia${windyDays.length > 1 ? 's' : ''} com rajadas acima de 30 km/h. Risco para trabalhos em altura e estruturas temporárias.`,
-      days: windyDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      title: "Alerta de Ventos Críticos",
+      description: `${criticalWindDays.length} dia${criticalWindDays.length > 1 ? 's' : ''} com rajadas ≥${thresholds.wind.critical}km/h. Trabalhos em altura suspensos.`,
+      days: criticalWindDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <Wind className="w-5 h-5" />,
     });
-  } else if (moderateWindDays.length >= 2) {
+  }
+  
+  if (warningWindDays.length > 0) {
     alerts.push({
       id: "wind-warning",
       type: "wind",
       severity: "warning",
       title: "Atenção: Ventos Moderados",
-      description: `${moderateWindDays.length} dias com ventos entre 20-30 km/h. Monitore atividades sensíveis ao vento.`,
-      days: moderateWindDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      description: `${warningWindDays.length} dia${warningWindDays.length > 1 ? 's' : ''} com ventos entre ${thresholds.wind.warning}-${thresholds.wind.critical}km/h.`,
+      days: warningWindDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <Wind className="w-5 h-5" />,
     });
   }
   
-  // Check for extreme heat
-  const hotDays = data.filter(day => day.tempMax >= 35);
-  const warmDays = data.filter(day => day.tempMax >= 32 && day.tempMax < 35);
+  // Check for extreme heat (above max threshold)
+  const criticalHeatDays = data.filter(day => day.tempMax >= thresholds.temperature.max + 5);
+  const warningHeatDays = data.filter(day => 
+    day.tempMax >= thresholds.temperature.max && 
+    day.tempMax < thresholds.temperature.max + 5
+  );
   
-  if (hotDays.length > 0) {
+  if (criticalHeatDays.length > 0) {
     alerts.push({
       id: "heat-critical",
       type: "heat",
       severity: "critical",
       title: "Alerta de Calor Extremo",
-      description: `${hotDays.length} dia${hotDays.length > 1 ? 's' : ''} com temperatura acima de 35°C. Risco de estresse térmico para trabalhadores.`,
-      days: hotDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      description: `${criticalHeatDays.length} dia${criticalHeatDays.length > 1 ? 's' : ''} com temperatura ≥${thresholds.temperature.max + 5}°C. Risco de estresse térmico.`,
+      days: criticalHeatDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <ThermometerSun className="w-5 h-5" />,
     });
-  } else if (warmDays.length >= 3) {
+  }
+  
+  if (warningHeatDays.length > 0) {
     alerts.push({
       id: "heat-warning",
       type: "heat",
       severity: "warning",
       title: "Atenção: Calor Intenso",
-      description: `${warmDays.length} dias com temperatura elevada (32-35°C). Reforce hidratação e pausas.`,
-      days: warmDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      description: `${warningHeatDays.length} dia${warningHeatDays.length > 1 ? 's' : ''} com temperatura acima do limite (${thresholds.temperature.max}°C).`,
+      days: warningHeatDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <ThermometerSun className="w-5 h-5" />,
     });
   }
   
-  // Check for combined risks (worst days)
-  const criticalDays = data.filter(
-    day => day.precipitationProbability >= 70 && day.windMax >= 25
+  // Check for extreme cold (below min threshold)
+  const criticalColdDays = data.filter(day => day.tempMin <= thresholds.temperature.min - 5);
+  const warningColdDays = data.filter(day => 
+    day.tempMin <= thresholds.temperature.min && 
+    day.tempMin > thresholds.temperature.min - 5
   );
   
-  if (criticalDays.length > 0) {
+  if (criticalColdDays.length > 0) {
+    alerts.push({
+      id: "cold-critical",
+      type: "cold",
+      severity: "critical",
+      title: "Alerta de Frio Extremo",
+      description: `${criticalColdDays.length} dia${criticalColdDays.length > 1 ? 's' : ''} com temperatura ≤${thresholds.temperature.min - 5}°C. Risco de hipotermia.`,
+      days: criticalColdDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      icon: <Snowflake className="w-5 h-5" />,
+    });
+  }
+  
+  if (warningColdDays.length > 0) {
+    alerts.push({
+      id: "cold-warning",
+      type: "cold",
+      severity: "warning",
+      title: "Atenção: Frio Intenso",
+      description: `${warningColdDays.length} dia${warningColdDays.length > 1 ? 's' : ''} com temperatura abaixo do limite (${thresholds.temperature.min}°C).`,
+      days: warningColdDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      icon: <Snowflake className="w-5 h-5" />,
+    });
+  }
+  
+  // Check for combined critical risks
+  const combinedCriticalDays = data.filter(
+    day => 
+      (day.precipitation >= thresholds.precipitation.critical || day.precipitationProbability >= 80) && 
+      day.windMax >= thresholds.wind.warning
+  );
+  
+  if (combinedCriticalDays.length > 0) {
     alerts.unshift({
       id: "combined-critical",
       type: "combined",
       severity: "critical",
       title: "Condições Críticas Combinadas",
-      description: `${criticalDays.length} dia${criticalDays.length > 1 ? 's' : ''} com chuva intensa E ventos fortes simultaneamente. Considere suspender atividades externas.`,
-      days: criticalDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
+      description: `${combinedCriticalDays.length} dia${combinedCriticalDays.length > 1 ? 's' : ''} com chuva + ventos fortes. Considere suspender atividades externas.`,
+      days: combinedCriticalDays.map(d => format(d.date, "EEE, dd/MM", { locale: ptBR })),
       icon: <AlertTriangle className="w-5 h-5" />,
     });
   }
@@ -213,14 +275,20 @@ function AlertCard({ alert, onDismiss }: AlertCardProps) {
   );
 }
 
-export function WeatherAlerts({ forecastData, severityFilter }: WeatherAlertsProps) {
+export function WeatherAlerts({ forecastData, severityFilter, thresholds }: WeatherAlertsProps) {
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const { isSupported, permission, requestPermission, sendNotification } = useNotifications();
   const { toast } = useToast();
   const sentNotificationsRef = useRef<Set<string>>(new Set());
   
-  const allAlerts = forecastData && forecastData.length > 0 ? analyzeForecasts(forecastData) : [];
+  // Use provided thresholds or defaults
+  const activeThresholds = thresholds || defaultThresholds;
+  
+  const allAlerts = useMemo(() => {
+    if (!forecastData || forecastData.length === 0) return [];
+    return analyzeForecasts(forecastData, activeThresholds);
+  }, [forecastData, activeThresholds]);
   
   // Apply severity filter
   const filteredBySeverity = allAlerts.filter(alert => {
@@ -303,6 +371,24 @@ export function WeatherAlerts({ forecastData, severityFilter }: WeatherAlertsPro
   }
   
   if (visibleAlerts.length === 0) {
+    // Show a success message when using custom thresholds
+    if (thresholds) {
+      return (
+        <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-emerald-500/20 text-emerald-600">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground">Nenhum alerta ativo</h4>
+              <p className="text-sm text-muted-foreground">
+                Previsão dentro dos limites configurados para sua organização.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return null;
   }
   

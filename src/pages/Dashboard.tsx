@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useOrganization } from "@/hooks/use-organization";
 
 interface WeatherData {
   tempMax: number;
@@ -33,13 +34,9 @@ interface ChartDataPoint {
 }
 
 export default function Dashboard() {
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>({
-    id: "1",
-    name: "São Paulo",
-    state: "SP",
-    latitude: -23.5475,
-    longitude: -46.6361,
-  });
+  const { organization } = useOrganization();
+  
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -140,10 +137,11 @@ export default function Dashboard() {
               {/* Weather Data */}
               {!isLoading && !error && weatherData && (
                 <>
-                  {/* Weather Alerts */}
+                  {/* Weather Alerts - Using organization thresholds */}
                   <WeatherAlerts 
                     forecastData={filteredForecastData} 
                     severityFilter={filters.alertSeverity}
+                    thresholds={organization?.config.thresholds}
                   />
 
                   {/* Executive KPIs */}
