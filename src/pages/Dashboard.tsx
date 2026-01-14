@@ -12,7 +12,9 @@ import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { WeatherCalendar } from "@/components/dashboard/WeatherCalendar";
+import { DataImportWizard } from "@/components/organization/DataImportWizard";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,10 +38,11 @@ interface ChartDataPoint {
 
 export default function Dashboard() {
   const { organization } = useOrganization();
-  const { data: operationalData, fetchData: fetchOperationalData } = useOperationalData(organization?.id);
+  const { data: operationalData, fetchData: fetchOperationalData, importBatch, isLoading: isOperationalLoading } = useOperationalData(organization?.id);
   const { kpis, hasData: hasOperationalData } = useKPICalculator(operationalData);
   
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -52,13 +55,36 @@ export default function Dashboard() {
   // Fetch operational data when organization loads
   useEffect(() => {
     if (organization?.id) {
-      // Fetch last 7 days of operational data
+      // Fetch last 30 days of operational data
       const endDate = new Date();
       const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
+      startDate.setDate(startDate.getDate() - 30);
       fetchOperationalData(startDate, endDate);
     }
   }, [organization?.id, fetchOperationalData]);
+
+  // Handle CSV import
+  const handleImportData = async (data: Record<string, string | number>[]) => {
+    const records = data.map(row => ({
+      date: new Date(row.date as string),
+      scheduledOperations: Number(row.scheduled) || 0,
+      completedOperations: Number(row.completed) || 0,
+      cancelledOperations: Number(row.cancelled) || 0,
+      cancellationReason: row.reason as string || undefined,
+      locationId: row.location as string || '',
+      weatherImpact: (row.reason as string)?.toLowerCase().includes('chuva') || 
+                     (row.reason as string)?.toLowerCase().includes('clima') ||
+                     (row.reason as string)?.toLowerCase().includes('tempo') ||
+                     (row.reason as string)?.toLowerCase().includes('tempestade') ||
+                     false,
+      customData: {},
+    }));
+
+    const success = await importBatch(records);
+    if (success) {
+      setIsImportDialogOpen(false);
+    }
+  };
   // Fetch weather data when location changes
   useEffect(() => {
     async function fetchWeatherData() {
@@ -225,17 +251,77 @@ export default function Dashboard() {
                   <h3 className="font-display font-semibold flex items-center gap-2">
                     <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
                     Meus Dados Operacionais
+                    {hasOperationalData && (
+                      <span className="text-xs text-muted-foreground font-normal">
+                        ({operationalData.length} registros)
+                      </span>
+                    )}
                   </h3>
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Importar CSV
-                  </Button>
+                  <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Upload className="w-4 h-4 mr-2" />
+                        Importar CSV
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DataImportWizard 
+                        onImport={handleImportData}
+                        onClose={() => setIsImportDialogOpen(false)}
+                      />
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <div className="text-center py-12 text-muted-foreground">
-                  <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                  <p className="text-sm">Nenhum dado importado ainda</p>
-                  <p className="text-xs mt-1">Importe um arquivo CSV para correlacionar com dados climáticos</p>
-                </div>
+                
+                {hasOperationalData ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Data</th>
+                          <th className="text-center py-2 px-3 font-medium text-muted-foreground">Agendadas</th>
+                          <th className="text-center py-2 px-3 font-medium text-muted-foreground">Concluídas</th>
+                          <th className="text-center py-2 px-3 font-medium text-muted-foreground">Canceladas</th>
+                          <th className="text-left py-2 px-3 font-medium text-muted-foreground">Motivo</th>
+                          <th className="text-center py-2 px-3 font-medium text-muted-foreground">Clima</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {operationalData.slice(0, 10).map((record) => (
+                          <tr key={record.id} className="border-b border-border/50 hover:bg-secondary/30">
+                            <td className="py-2 px-3">
+                              {record.date.toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="text-center py-2 px-3">{record.scheduledOperations}</td>
+                            <td className="text-center py-2 px-3 text-success">{record.completedOperations}</td>
+                            <td className="text-center py-2 px-3 text-destructive">{record.cancelledOperations}</td>
+                            <td className="py-2 px-3 text-muted-foreground truncate max-w-[200px]">
+                              {record.cancellationReason || '-'}
+                            </td>
+                            <td className="text-center py-2 px-3">
+                              {record.weatherImpact ? (
+                                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-warning/20 text-warning">⚡</span>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {operationalData.length > 10 && (
+                      <p className="text-center text-xs text-muted-foreground mt-3">
+                        Mostrando 10 de {operationalData.length} registros
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <FileSpreadsheet className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="text-sm">Nenhum dado importado ainda</p>
+                    <p className="text-xs mt-1">Importe um arquivo CSV para correlacionar com dados climáticos</p>
+                  </div>
+                )}
               </div>
             </div>
           ) : (
