@@ -17,7 +17,8 @@ import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react
 import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrganization } from "@/hooks/use-organization";
-
+import { useOperationalData } from "@/hooks/use-operational-data";
+import { useKPICalculator } from "@/hooks/use-kpi-calculator";
 interface WeatherData {
   tempMax: number;
   tempMin: number;
@@ -35,6 +36,8 @@ interface ChartDataPoint {
 
 export default function Dashboard() {
   const { organization } = useOrganization();
+  const { data: operationalData, fetchData: fetchOperationalData } = useOperationalData(organization?.id);
+  const { kpis, hasData: hasOperationalData } = useKPICalculator(operationalData);
   
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
@@ -46,6 +49,16 @@ export default function Dashboard() {
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fetch operational data when organization loads
+  useEffect(() => {
+    if (organization?.id) {
+      // Fetch last 7 days of operational data
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 7);
+      fetchOperationalData(startDate, endDate);
+    }
+  }, [organization?.id, fetchOperationalData]);
   // Fetch weather data when location changes
   useEffect(() => {
     async function fetchWeatherData() {
@@ -144,8 +157,12 @@ export default function Dashboard() {
                     thresholds={organization?.config.thresholds}
                   />
 
-                  {/* Executive KPIs */}
-                  <ExecutiveKPIs />
+                  {/* Executive KPIs - Connected to real data */}
+                  <ExecutiveKPIs 
+                    data={kpis} 
+                    hasData={hasOperationalData}
+                    periodLabel="Últimos 7 dias"
+                  />
 
                   {/* D-1 Cards */}
                   <div>

@@ -1,29 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, CloudRain, DollarSign, Activity, AlertTriangle } from "lucide-react";
+import { TrendingUp, TrendingDown, CloudRain, DollarSign, Activity, AlertTriangle, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface KPIData {
-  cancelledByWeather: number;
-  totalCancelled: number;
-  impactedByRain: number;
-  impactPercentage: number;
-  potentialSavings: number;
-  productivityRecovered: number;
-}
+import type { KPIData } from "@/hooks/use-kpi-calculator";
 
 interface ExecutiveKPIsProps {
   data?: KPIData;
+  hasData?: boolean;
+  periodLabel?: string;
 }
-
-// Demo data based on document specs
-const defaultData: KPIData = {
-  cancelledByWeather: 23,
-  totalCancelled: 45,
-  impactedByRain: 18,
-  impactPercentage: 78,
-  potentialSavings: 45200,
-  productivityRecovered: 34,
-};
 
 interface KPICardProps {
   title: string;
@@ -85,16 +69,45 @@ function KPICard({ title, value, subtitle, icon, trend, variant = "default" }: K
   );
 }
 
-export function ExecutiveKPIs({ data = defaultData }: ExecutiveKPIsProps) {
+function EmptyState() {
+  return (
+    <Card className="border-dashed border-2">
+      <CardContent className="p-8 text-center">
+        <BarChart3 className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+        <h3 className="font-display font-semibold text-lg mb-2">Sem dados operacionais</h3>
+        <p className="text-sm text-muted-foreground max-w-md mx-auto">
+          Importe seus dados operacionais (CSV) para ver KPIs calculados automaticamente
+          com base no impacto climático nas suas operações.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ExecutiveKPIs({ data, hasData = false, periodLabel = "Período selecionado" }: ExecutiveKPIsProps) {
   const formatCurrency = (value: number) => {
+    if (value === 0) return "R$ 0";
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-      notation: "compact",
+      minimumFractionDigits: value >= 1000 ? 1 : 0,
+      maximumFractionDigits: value >= 1000 ? 1 : 0,
+      notation: value >= 10000 ? "compact" : "standard",
     }).format(value);
   };
+
+  if (!hasData || !data) {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+            KPIs Executivos
+          </h2>
+        </div>
+        <EmptyState />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -102,7 +115,7 @@ export function ExecutiveKPIs({ data = defaultData }: ExecutiveKPIsProps) {
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
           KPIs Executivos
         </h2>
-        <span className="text-xs text-muted-foreground">Últimos 7 dias</span>
+        <span className="text-xs text-muted-foreground">{periodLabel}</span>
       </div>
       
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -111,34 +124,31 @@ export function ExecutiveKPIs({ data = defaultData }: ExecutiveKPIsProps) {
           value={data.cancelledByWeather}
           subtitle={`de ${data.totalCancelled} cancelamentos totais`}
           icon={<AlertTriangle className="w-5 h-5" />}
-          variant="danger"
-          trend={{ value: 12, isPositive: false }}
+          variant={data.cancelledByWeather > 0 ? "danger" : "default"}
         />
         
         <KPICard
-          title="Impactados por Chuva"
+          title="Taxa de Impacto Climático"
           value={`${data.impactPercentage}%`}
           subtitle={`${data.impactedByRain} operações afetadas`}
           icon={<CloudRain className="w-5 h-5" />}
-          variant="warning"
+          variant={data.impactPercentage > 50 ? "warning" : "default"}
         />
         
         <KPICard
           title="Economia Potencial"
           value={formatCurrency(data.potentialSavings)}
-          subtitle="com planejamento baseado em clima"
+          subtitle="com planejamento climático"
           icon={<DollarSign className="w-5 h-5" />}
           variant="success"
-          trend={{ value: 23, isPositive: true }}
         />
         
         <KPICard
-          title="Produtividade Recuperada"
-          value={`+${data.productivityRecovered}%`}
-          subtitle="vs. período sem análise climática"
+          title="Taxa de Conclusão"
+          value={`${data.completionRate}%`}
+          subtitle={`${data.totalCompleted} de ${data.totalScheduled} operações`}
           icon={<Activity className="w-5 h-5" />}
-          variant="success"
-          trend={{ value: 8, isPositive: true }}
+          variant={data.completionRate >= 80 ? "success" : data.completionRate >= 60 ? "warning" : "danger"}
         />
       </div>
     </div>
