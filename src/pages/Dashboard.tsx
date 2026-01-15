@@ -202,7 +202,7 @@ export default function Dashboard() {
                     <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">
                       Dados D-1 (Ontem)
                     </h2>
-                    <WeatherCards data={weatherData} />
+                    <WeatherCards data={weatherData} thresholds={organization?.config.thresholds} />
                   </div>
 
                   {/* Forecast Section with Tabs */}
