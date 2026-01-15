@@ -12,6 +12,7 @@ import { OccurrencesTable } from "@/components/dashboard/OccurrencesTable";
 import { WeatherForecast } from "@/components/dashboard/WeatherForecast";
 import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { WeatherCalendar } from "@/components/dashboard/WeatherCalendar";
+import { WeatherCorrelationChart } from "@/components/dashboard/WeatherCorrelationChart";
 import { DataImportWizard } from "@/components/organization/DataImportWizard";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
@@ -187,7 +188,13 @@ export default function Dashboard() {
                   <ExecutiveKPIs 
                     data={kpis} 
                     hasData={hasOperationalData}
-                    periodLabel="Últimos 7 dias"
+                    periodLabel="Últimos 30 dias"
+                  />
+
+                  {/* Weather Correlation Chart */}
+                  <WeatherCorrelationChart 
+                    operationalData={operationalData}
+                    weatherData={chartData}
                   />
 
                   {/* D-1 Cards */}
