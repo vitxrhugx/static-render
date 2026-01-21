@@ -53,16 +53,12 @@ export default function Dashboard() {
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch operational data when organization loads
+  // Fetch operational data based on filter date range
   useEffect(() => {
     if (organization?.id) {
-      // Fetch last 30 days of operational data
-      const endDate = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-      fetchOperationalData(startDate, endDate);
+      fetchOperationalData(filters.dateRange.from, filters.dateRange.to);
     }
-  }, [organization?.id, fetchOperationalData]);
+  }, [organization?.id, filters.dateRange.from, filters.dateRange.to, fetchOperationalData]);
 
   // Handle CSV import
   const handleImportData = async (data: Record<string, string | number>[]) => {
@@ -188,7 +184,13 @@ export default function Dashboard() {
                   <ExecutiveKPIs 
                     data={kpis} 
                     hasData={hasOperationalData}
-                    periodLabel="Últimos 30 dias"
+                    periodLabel={filters.period === "custom" 
+                      ? `${filters.dateRange.from.toLocaleDateString('pt-BR')} - ${filters.dateRange.to.toLocaleDateString('pt-BR')}`
+                      : filters.period === "today" ? "Hoje" 
+                      : filters.period === "7d" ? "Últimos 7 dias" 
+                      : filters.period === "14d" ? "Últimos 14 dias" 
+                      : "Últimos 30 dias"
+                    }
                   />
 
                   {/* Weather Correlation Chart */}
