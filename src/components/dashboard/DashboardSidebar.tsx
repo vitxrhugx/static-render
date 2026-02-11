@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, MapPin, Star, X, Loader2, Plus, Settings } from "lucide-react";
+import { Search, MapPin, Star, X, Loader2, Plus, Settings, ChevronLeft } from "lucide-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { searchLocations, GeocodingResult } from "@/lib/openmeteo";
 import { useOrganization } from "@/hooks/use-organization";
 import { Link } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 export interface Location {
   id: string;
@@ -18,9 +19,11 @@ export interface Location {
 interface DashboardSidebarProps {
   selectedLocation: Location | null;
   onSelectLocation: (location: Location) => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function DashboardSidebar({ selectedLocation, onSelectLocation }: DashboardSidebarProps) {
+export function DashboardSidebar({ selectedLocation, onSelectLocation, isOpen = true, onClose }: DashboardSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<GeocodingResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -117,9 +120,29 @@ export function DashboardSidebar({ selectedLocation, onSelectLocation }: Dashboa
   };
 
   return (
-    <aside className="w-64 bg-card border-r border-border h-full flex flex-col">
-      {/* Search */}
-      <div className="p-4 border-b border-border">
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside className={cn(
+        "bg-card border-r border-border h-full flex flex-col transition-all duration-300 z-50",
+        "fixed md:relative md:translate-x-0",
+        "w-72 md:w-64",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+        {/* Mobile close button */}
+        <div className="flex items-center justify-between p-4 md:hidden border-b border-border">
+          <span className="font-display font-semibold text-sm">Localidades</span>
+          <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+        </div>
+        {/* Search */}
+        <div className="p-4 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -170,7 +193,7 @@ export function DashboardSidebar({ selectedLocation, onSelectLocation }: Dashboa
             <p className="text-sm text-muted-foreground">Nenhuma localidade encontrada</p>
           </div>
         )}
-      </div>
+        </div>
 
       {/* Saved Locations */}
       <div className="flex-1 overflow-auto">
@@ -220,5 +243,6 @@ export function DashboardSidebar({ selectedLocation, onSelectLocation }: Dashboa
         </Button>
       </div>
     </aside>
+    </>
   );
 }

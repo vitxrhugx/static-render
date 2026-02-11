@@ -36,7 +36,10 @@
 
     --radius: 0.75rem;
 
-    /* Climatch Custom Colors */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
     --climatch-blue: 217 91% 60%;
     --climatch-blue-dark: 217 91% 50%;
     --climatch-green: 160 84% 39%;
@@ -93,9 +96,14 @@
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
     --ring: 217 91% 60%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
 
     --sidebar-background: 222 47% 14%;
     --sidebar-foreground: 210 40% 98%;

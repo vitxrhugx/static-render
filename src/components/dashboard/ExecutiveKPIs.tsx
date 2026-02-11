@@ -37,7 +37,7 @@ function KPICard({ title, value, subtitle, icon, trend, variant = "default" }: K
   };
 
   return (
-    <Card className={cn("shadow-card transition-all hover:shadow-lg hover:-translate-y-0.5", variantStyles[variant])}>
+    <Card className={cn("shadow-card transition-all duration-300 hover:shadow-lg hover:-translate-y-1 group", variantStyles[variant])}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -62,7 +62,7 @@ function KPICard({ title, value, subtitle, icon, trend, variant = "default" }: K
             </div>
             {subtitle && <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>}
           </div>
-          <div className={cn("p-3 rounded-xl", iconVariantStyles[variant])}>{icon}</div>
+          <div className={cn("p-3 rounded-xl group-hover:scale-110 transition-transform duration-300", iconVariantStyles[variant])}>{icon}</div>
         </div>
       </CardContent>
     </Card>
