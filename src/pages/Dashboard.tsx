@@ -44,6 +44,7 @@ export default function Dashboard() {
   
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -124,17 +125,22 @@ export default function Dashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <DashboardHeader />
+      <DashboardHeader onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
       
       <div className="flex-1 flex overflow-hidden">
         <DashboardSidebar 
           selectedLocation={selectedLocation}
-          onSelectLocation={setSelectedLocation}
+          onSelectLocation={(loc) => {
+            setSelectedLocation(loc);
+            setIsSidebarOpen(false);
+          }}
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
         />
         
-        <main className="flex-1 overflow-auto p-6">
+        <main className="flex-1 overflow-auto p-4 md:p-6">
           {selectedLocation ? (
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
               {/* Location Header */}
               <div className="flex flex-col gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -255,7 +261,7 @@ export default function Dashboard() {
               )}
 
               {/* Operational Data Section */}
-              <div className="bg-card rounded-xl p-6 shadow-card">
+              <div className="bg-card rounded-xl p-6 shadow-card hover:shadow-card-hover transition-shadow duration-300">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-display font-semibold flex items-center gap-2">
                     <FileSpreadsheet className="w-5 h-5 text-muted-foreground" />
@@ -334,11 +340,13 @@ export default function Dashboard() {
               </div>
             </div>
           ) : (
-            <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center animate-fade-in">
               <div className="text-center text-muted-foreground">
-                <MapPin className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-muted/50 flex items-center justify-center">
+                  <MapPin className="w-10 h-10 opacity-50" />
+                </div>
                 <h2 className="text-xl font-display font-semibold mb-2">Selecione uma localidade</h2>
-                <p className="text-sm">Use a busca na barra lateral para encontrar e salvar localidades</p>
+                <p className="text-sm max-w-xs mx-auto">Use a busca na barra lateral para encontrar e salvar localidades</p>
               </div>
             </div>
           )}

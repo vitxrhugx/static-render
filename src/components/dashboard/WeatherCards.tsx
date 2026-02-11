@@ -113,13 +113,13 @@ export function WeatherCards({ data, thresholds }: WeatherCardsProps) {
           <div
             key={card.label}
             className={cn(
-              "bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover transition-all duration-300 animate-fade-in border-2",
+              "bg-card rounded-xl p-5 shadow-card hover:shadow-card-hover hover:-translate-y-1 transition-all duration-300 animate-fade-in border-2 group cursor-default",
               styles.border
             )}
             style={{ animationDelay: `${index * 0.1}s` }}
           >
             <div className="flex items-start justify-between mb-3">
-              <div className={`w-10 h-10 rounded-lg ${card.gradient} flex items-center justify-center`}>
+              <div className={`w-10 h-10 rounded-lg ${card.gradient} flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform duration-300`}>
                 <card.icon className="w-5 h-5 text-primary-foreground" />
               </div>
               <div className="flex items-center gap-1.5">
