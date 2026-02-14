@@ -276,7 +276,7 @@ export default function Dashboard() {
                     <DialogTrigger asChild>
                       <Button variant="outline" size="sm">
                         <Upload className="w-4 h-4 mr-2" />
-                        Importar CSV
+                        Importar Dados
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-2xl">

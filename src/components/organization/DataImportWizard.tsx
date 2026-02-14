@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -18,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Upload, 
   FileSpreadsheet, 
@@ -26,16 +28,22 @@ import {
   AlertCircle,
   ArrowRight,
   ArrowLeft,
-  Download
+  Download,
+  Link,
+  Loader2,
+  Globe
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import * as XLSX from "xlsx";
 
 interface DataImportWizardProps {
   onImport: (data: Record<string, string | number>[]) => void;
   onClose?: () => void;
 }
 
-type Step = 'upload' | 'mapping' | 'preview' | 'complete';
+type Step = 'source' | 'upload' | 'mapping' | 'preview' | 'complete';
+type Source = 'csv' | 'excel' | 'google-sheets';
 
 const standardFields = [
   { id: 'date', label: 'Data', required: true },
@@ -48,68 +56,171 @@ const standardFields = [
 ];
 
 export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
-  const [step, setStep] = useState<Step>('upload');
+  const [step, setStep] = useState<Step>('source');
+  const [source, setSource] = useState<Source>('csv');
   const [file, setFile] = useState<File | null>(null);
   const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
   const [csvData, setCsvData] = useState<string[][]>([]);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<string[]>([]);
+  const [googleSheetsUrl, setGoogleSheetsUrl] = useState('');
+  const [isLoadingSheets, setIsLoadingSheets] = useState(false);
+
+  const autoDetectMapping = (headers: string[]) => {
+    const autoMapping: Record<string, string> = {};
+    headers.forEach((header, index) => {
+      const headerLower = header.toLowerCase();
+      if (headerLower.includes('data') || headerLower.includes('date')) {
+        autoMapping[index.toString()] = 'date';
+      } else if (headerLower.includes('agendad') || headerLower.includes('schedule')) {
+        autoMapping[index.toString()] = 'scheduled';
+      } else if (headerLower.includes('conclu') || headerLower.includes('complete')) {
+        autoMapping[index.toString()] = 'completed';
+      } else if (headerLower.includes('cancel')) {
+        autoMapping[index.toString()] = 'cancelled';
+      } else if (headerLower.includes('motivo') || headerLower.includes('reason')) {
+        autoMapping[index.toString()] = 'reason';
+      } else if (headerLower.includes('local') || headerLower.includes('location')) {
+        autoMapping[index.toString()] = 'location';
+      }
+    });
+    return autoMapping;
+  };
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = event.target.files?.[0];
     if (!uploadedFile) return;
 
-    if (!uploadedFile.name.endsWith('.csv')) {
+    const ext = uploadedFile.name.split('.').pop()?.toLowerCase();
+    
+    if (source === 'csv' && ext !== 'csv') {
       setErrors(['Por favor, selecione um arquivo CSV']);
+      return;
+    }
+
+    if (source === 'excel' && !['xlsx', 'xls'].includes(ext || '')) {
+      setErrors(['Por favor, selecione um arquivo Excel (.xlsx ou .xls)']);
       return;
     }
 
     setFile(uploadedFile);
     setErrors([]);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim());
-      
-      if (lines.length < 2) {
-        setErrors(['O arquivo deve conter pelo menos um cabeçalho e uma linha de dados']);
-        return;
-      }
+    if (source === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        parseCSVText(text);
+      };
+      reader.readAsText(uploadedFile);
+    } else if (source === 'excel') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          // Use first sheet
+          const sheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[sheetName];
+          
+          // Convert to array of arrays
+          const jsonData = XLSX.utils.sheet_to_json<string[]>(worksheet, { header: 1 });
+          
+          if (jsonData.length < 2) {
+            setErrors(['O arquivo deve conter pelo menos um cabeçalho e uma linha de dados']);
+            return;
+          }
 
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-      const data = lines.slice(1).map(line => 
-        line.split(',').map(cell => cell.trim().replace(/"/g, ''))
+          const headers = (jsonData[0] as string[]).map(h => String(h || '').trim());
+          const rows = jsonData.slice(1).map(row => 
+            (row as string[]).map(cell => String(cell || '').trim())
+          ).filter(row => row.some(cell => cell !== ''));
+
+          setCsvHeaders(headers);
+          setCsvData(rows);
+          setColumnMapping(autoDetectMapping(headers));
+          setStep('mapping');
+        } catch (err) {
+          console.error('Excel parse error:', err);
+          setErrors(['Erro ao ler o arquivo Excel. Verifique se o arquivo não está corrompido.']);
+        }
+      };
+      reader.readAsArrayBuffer(uploadedFile);
+    }
+  }, [source]);
+
+  const parseCSVText = (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      setErrors(['O arquivo deve conter pelo menos um cabeçalho e uma linha de dados']);
+      return;
+    }
+
+    const parseCSVLine = (line: string): string[] => {
+      const result: string[] = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const headers = parseCSVLine(lines[0]);
+    const data = lines.slice(1).map(line => parseCSVLine(line));
+
+    setCsvHeaders(headers);
+    setCsvData(data);
+    setColumnMapping(autoDetectMapping(headers));
+    setStep('mapping');
+  };
+
+  const handleGoogleSheetsImport = async () => {
+    if (!googleSheetsUrl.trim()) {
+      setErrors(['Insira o link da planilha do Google Sheets']);
+      return;
+    }
+
+    setIsLoadingSheets(true);
+    setErrors([]);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('google-sheets-import', {
+        body: { url: googleSheetsUrl },
+      });
+
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      const headers = data.headers as string[];
+      const rows = (data.data as Record<string, string>[]).map(row => 
+        headers.map(h => row[h] || '')
       );
 
       setCsvHeaders(headers);
-      setCsvData(data);
-
-      // Auto-detect mapping based on header names
-      const autoMapping: Record<string, string> = {};
-      headers.forEach((header, index) => {
-        const headerLower = header.toLowerCase();
-        if (headerLower.includes('data') || headerLower.includes('date')) {
-          autoMapping[index.toString()] = 'date';
-        } else if (headerLower.includes('agendad') || headerLower.includes('schedule')) {
-          autoMapping[index.toString()] = 'scheduled';
-        } else if (headerLower.includes('conclu') || headerLower.includes('complete')) {
-          autoMapping[index.toString()] = 'completed';
-        } else if (headerLower.includes('cancel')) {
-          autoMapping[index.toString()] = 'cancelled';
-        } else if (headerLower.includes('motivo') || headerLower.includes('reason')) {
-          autoMapping[index.toString()] = 'reason';
-        } else if (headerLower.includes('local') || headerLower.includes('location')) {
-          autoMapping[index.toString()] = 'location';
-        }
-      });
-
-      setColumnMapping(autoMapping);
+      setCsvData(rows);
+      setColumnMapping(autoDetectMapping(headers));
       setStep('mapping');
-    };
-
-    reader.readAsText(uploadedFile);
-  }, []);
+    } catch (err) {
+      console.error('Google Sheets error:', err);
+      const msg = err instanceof Error ? err.message : 'Erro ao importar Google Sheets';
+      setErrors([msg]);
+    } finally {
+      setIsLoadingSheets(false);
+    }
+  };
 
   const handleMappingChange = (columnIndex: string, fieldId: string) => {
     setColumnMapping(prev => ({
@@ -140,7 +251,6 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
       Object.entries(columnMapping).forEach(([colIndex, fieldId]) => {
         if (fieldId !== 'ignore') {
           const value = row[parseInt(colIndex)] || '';
-          // Try to parse numbers
           const numValue = parseFloat(value);
           mappedRow[fieldId] = isNaN(numValue) ? value : numValue;
         }
@@ -179,11 +289,18 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
 
   const getStepProgress = () => {
     switch (step) {
-      case 'upload': return 25;
-      case 'mapping': return 50;
-      case 'preview': return 75;
+      case 'source': return 10;
+      case 'upload': return 30;
+      case 'mapping': return 55;
+      case 'preview': return 80;
       case 'complete': return 100;
     }
+  };
+
+  const sourceLabels: Record<Source, string> = {
+    csv: 'CSV',
+    excel: 'Excel',
+    'google-sheets': 'Google Sheets',
   };
 
   return (
@@ -198,33 +315,121 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
         </CardDescription>
         <Progress value={getStepProgress()} className="h-2 mt-4" />
         <div className="flex justify-between text-xs text-muted-foreground mt-2">
-          <span className={cn(step === 'upload' && "text-primary font-medium")}>1. Upload</span>
-          <span className={cn(step === 'mapping' && "text-primary font-medium")}>2. Mapeamento</span>
-          <span className={cn(step === 'preview' && "text-primary font-medium")}>3. Preview</span>
-          <span className={cn(step === 'complete' && "text-primary font-medium")}>4. Concluído</span>
+          <span className={cn(step === 'source' && "text-primary font-medium")}>1. Fonte</span>
+          <span className={cn(step === 'upload' && "text-primary font-medium")}>2. Dados</span>
+          <span className={cn(step === 'mapping' && "text-primary font-medium")}>3. Mapeamento</span>
+          <span className={cn(step === 'preview' && "text-primary font-medium")}>4. Preview</span>
+          <span className={cn(step === 'complete' && "text-primary font-medium")}>5. Concluído</span>
         </div>
       </CardHeader>
 
       <CardContent>
-        {/* Step 1: Upload */}
+        {/* Step 1: Source Selection */}
+        {step === 'source' && (
+          <div className="space-y-6">
+            <p className="text-sm font-medium">Escolha a fonte dos dados:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <button
+                onClick={() => { setSource('csv'); setStep('upload'); }}
+                className={cn(
+                  "flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all hover:border-primary/50 hover:bg-secondary/30",
+                  "cursor-pointer text-center"
+                )}
+              >
+                <FileSpreadsheet className="w-10 h-10 text-green-600" />
+                <div>
+                  <p className="font-medium">CSV</p>
+                  <p className="text-xs text-muted-foreground">Arquivo .csv</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => { setSource('excel'); setStep('upload'); }}
+                className={cn(
+                  "flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all hover:border-primary/50 hover:bg-secondary/30",
+                  "cursor-pointer text-center"
+                )}
+              >
+                <FileSpreadsheet className="w-10 h-10 text-emerald-700" />
+                <div>
+                  <p className="font-medium">Excel</p>
+                  <p className="text-xs text-muted-foreground">.xlsx, .xls</p>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => { setSource('google-sheets'); setStep('upload'); }}
+                className={cn(
+                  "flex flex-col items-center gap-3 p-6 rounded-xl border-2 transition-all hover:border-primary/50 hover:bg-secondary/30",
+                  "cursor-pointer text-center"
+                )}
+              >
+                <Globe className="w-10 h-10 text-blue-600" />
+                <div>
+                  <p className="font-medium">Google Sheets</p>
+                  <p className="text-xs text-muted-foreground">Link público</p>
+                </div>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <Button variant="outline" onClick={downloadTemplate}>
+                <Download className="w-4 h-4 mr-2" />
+                Baixar Template
+              </Button>
+              <p className="text-sm text-muted-foreground">
+                CSV, Excel ou Google Sheets
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2: Upload / Input */}
         {step === 'upload' && (
           <div className="space-y-6">
-            <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
-              <input
-                type="file"
-                accept=".csv"
-                onChange={handleFileUpload}
-                className="hidden"
-                id="csv-upload"
-              />
-              <label htmlFor="csv-upload" className="cursor-pointer">
-                <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="font-medium">Clique para selecionar um arquivo CSV</p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  ou arraste e solte aqui
+            {source === 'google-sheets' ? (
+              <div className="space-y-4">
+                <p className="text-sm font-medium">Cole o link da planilha do Google Sheets:</p>
+                <p className="text-xs text-muted-foreground">
+                  A planilha precisa estar compartilhada como "Qualquer pessoa com o link pode visualizar"
                 </p>
-              </label>
-            </div>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://docs.google.com/spreadsheets/d/..."
+                    value={googleSheetsUrl}
+                    onChange={(e) => setGoogleSheetsUrl(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button onClick={handleGoogleSheetsImport} disabled={isLoadingSheets}>
+                    {isLoadingSheets ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Link className="w-4 h-4" />
+                    )}
+                    <span className="ml-2">Importar</span>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-primary/50 transition-colors">
+                <input
+                  type="file"
+                  accept={source === 'csv' ? '.csv' : '.xlsx,.xls'}
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="file-upload"
+                />
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+                  <p className="font-medium">
+                    Clique para selecionar um arquivo {sourceLabels[source]}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {source === 'csv' ? 'Formato: .csv' : 'Formatos: .xlsx, .xls'}
+                  </p>
+                </label>
+              </div>
+            )}
 
             {errors.length > 0 && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3">
@@ -237,26 +442,27 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-4 border-t">
-              <Button variant="outline" onClick={downloadTemplate}>
-                <Download className="w-4 h-4 mr-2" />
-                Baixar Template
+            <div className="flex justify-between pt-4 border-t">
+              <Button variant="outline" onClick={() => setStep('source')}>
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar
               </Button>
               <p className="text-sm text-muted-foreground">
-                Formatos suportados: CSV
+                Fonte: {sourceLabels[source]}
               </p>
             </div>
           </div>
         )}
 
-        {/* Step 2: Mapping */}
+        {/* Step 3: Mapping */}
         {step === 'mapping' && (
           <div className="space-y-6">
             <div className="flex items-center gap-2 mb-4">
               <FileSpreadsheet className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">
-                {file?.name} • {csvData.length} linhas
+                {source === 'google-sheets' ? 'Google Sheets' : file?.name} • {csvData.length} linhas
               </span>
+              <Badge variant="outline">{sourceLabels[source]}</Badge>
             </div>
 
             <div className="space-y-3">
@@ -317,7 +523,7 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
           </div>
         )}
 
-        {/* Step 3: Preview */}
+        {/* Step 4: Preview */}
         {step === 'preview' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -372,7 +578,7 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
           </div>
         )}
 
-        {/* Step 4: Complete */}
+        {/* Step 5: Complete */}
         {step === 'complete' && (
           <div className="text-center py-8">
             <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mx-auto mb-4">
@@ -380,7 +586,7 @@ export function DataImportWizard({ onImport, onClose }: DataImportWizardProps) {
             </div>
             <h3 className="text-lg font-semibold mb-2">Importação Concluída!</h3>
             <p className="text-muted-foreground mb-6">
-              {csvData.length} registros foram importados com sucesso
+              {csvData.length} registros foram importados com sucesso via {sourceLabels[source]}
             </p>
             <Button onClick={onClose}>
               Fechar
