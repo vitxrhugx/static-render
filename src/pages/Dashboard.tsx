@@ -257,12 +257,10 @@ export default function Dashboard() {
                     </TabsContent>
                   </Tabs>
 
-                  {/* INMET Station Data */}
-                  <InmetDataPanel 
-                    latitude={selectedLocation.latitude} 
-                    longitude={selectedLocation.longitude} 
-                  />
-
+                  {/* Weather Sources & Confidence */}
+                  {unifiedResult && (
+                    <WeatherSourceBadge sourceInfo={unifiedResult.sourceInfo} />
+                  )}
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
