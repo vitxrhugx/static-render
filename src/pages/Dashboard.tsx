@@ -94,6 +94,7 @@ export default function Dashboard() {
         setWeatherData(null);
         setChartData([]);
         setForecastData(null);
+        setUnifiedResult(null);
         return;
       }
 
@@ -101,15 +102,24 @@ export default function Dashboard() {
       setIsForecastLoading(true);
       setError(null);
 
-      // Fetch historical and forecast data in parallel
-      const [weather, forecast] = await Promise.all([
-        getHistoricalWeather(selectedLocation.latitude, selectedLocation.longitude),
+      // Fetch unified weather data and forecast in parallel
+      const [unified, forecast] = await Promise.all([
+        getUnifiedWeatherData(selectedLocation.latitude, selectedLocation.longitude),
         getWeatherForecast(selectedLocation.latitude, selectedLocation.longitude),
       ]);
 
-      if (weather) {
-        setWeatherData(getD1Data(weather));
-        setChartData(formatChartData(weather));
+      setUnifiedResult(unified);
+
+      if (unified.d1) {
+        setWeatherData(unified.d1);
+        // Convert unified chart data to the format expected by charts
+        setChartData(unified.chartData.map(d => ({
+          date: d.date,
+          tempMax: d.tempMax ?? 0,
+          tempMin: d.tempMin ?? 0,
+          precipitation: d.precipitation ?? 0,
+          windMax: d.windMax ?? 0,
+        })));
       } else {
         setError("Não foi possível carregar os dados meteorológicos");
       }
