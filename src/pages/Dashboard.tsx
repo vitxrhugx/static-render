@@ -18,11 +18,13 @@ import { InmetDataPanel } from "@/components/dashboard/InmetDataPanel";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
-import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
+import { getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
+import { getUnifiedWeatherData, UnifiedWeatherResult } from "@/lib/unified-weather";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrganization } from "@/hooks/use-organization";
 import { useOperationalData } from "@/hooks/use-operational-data";
 import { useKPICalculator } from "@/hooks/use-kpi-calculator";
+import { WeatherSourceBadge } from "@/components/dashboard/WeatherSourceBadge";
 interface WeatherData {
   tempMax: number;
   tempMin: number;
