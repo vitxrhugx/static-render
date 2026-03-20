@@ -244,6 +244,12 @@ export default function Dashboard() {
                     </TabsContent>
                   </Tabs>
 
+                  {/* INMET Station Data */}
+                  <InmetDataPanel 
+                    latitude={selectedLocation.latitude} 
+                    longitude={selectedLocation.longitude} 
+                  />
+
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
