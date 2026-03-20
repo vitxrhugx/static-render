@@ -53,6 +53,7 @@ export default function Dashboard() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<ForecastDay[] | null>(null);
+  const [unifiedResult, setUnifiedResult] = useState<UnifiedWeatherResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
