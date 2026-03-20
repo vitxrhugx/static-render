@@ -14,7 +14,7 @@ import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { WeatherCalendar } from "@/components/dashboard/WeatherCalendar";
 import { WeatherCorrelationChart } from "@/components/dashboard/WeatherCorrelationChart";
 import { DataImportWizard } from "@/components/organization/DataImportWizard";
-import { InmetDataPanel } from "@/components/dashboard/InmetDataPanel";
+
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
