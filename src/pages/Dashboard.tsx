@@ -14,15 +14,17 @@ import { WeatherAlerts } from "@/components/dashboard/WeatherAlerts";
 import { WeatherCalendar } from "@/components/dashboard/WeatherCalendar";
 import { WeatherCorrelationChart } from "@/components/dashboard/WeatherCorrelationChart";
 import { DataImportWizard } from "@/components/organization/DataImportWizard";
-import { InmetDataPanel } from "@/components/dashboard/InmetDataPanel";
+
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { MapPin, Upload, FileSpreadsheet, Loader2, Calendar } from "lucide-react";
-import { getHistoricalWeather, formatChartData, getD1Data, getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
+import { getWeatherForecast, ForecastDay } from "@/lib/openmeteo";
+import { getUnifiedWeatherData, UnifiedWeatherResult } from "@/lib/unified-weather";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useOrganization } from "@/hooks/use-organization";
 import { useOperationalData } from "@/hooks/use-operational-data";
 import { useKPICalculator } from "@/hooks/use-kpi-calculator";
+import { WeatherSourceBadge } from "@/components/dashboard/WeatherSourceBadge";
 interface WeatherData {
   tempMax: number;
   tempMin: number;
@@ -51,6 +53,7 @@ export default function Dashboard() {
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
   const [forecastData, setForecastData] = useState<ForecastDay[] | null>(null);
+  const [unifiedResult, setUnifiedResult] = useState<UnifiedWeatherResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isForecastLoading, setIsForecastLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -91,6 +94,7 @@ export default function Dashboard() {
         setWeatherData(null);
         setChartData([]);
         setForecastData(null);
+        setUnifiedResult(null);
         return;
       }
 
@@ -98,15 +102,24 @@ export default function Dashboard() {
       setIsForecastLoading(true);
       setError(null);
 
-      // Fetch historical and forecast data in parallel
-      const [weather, forecast] = await Promise.all([
-        getHistoricalWeather(selectedLocation.latitude, selectedLocation.longitude),
+      // Fetch unified weather data and forecast in parallel
+      const [unified, forecast] = await Promise.all([
+        getUnifiedWeatherData(selectedLocation.latitude, selectedLocation.longitude),
         getWeatherForecast(selectedLocation.latitude, selectedLocation.longitude),
       ]);
 
-      if (weather) {
-        setWeatherData(getD1Data(weather));
-        setChartData(formatChartData(weather));
+      setUnifiedResult(unified);
+
+      if (unified.d1) {
+        setWeatherData(unified.d1);
+        // Convert unified chart data to the format expected by charts
+        setChartData(unified.chartData.map(d => ({
+          date: d.date,
+          tempMax: d.tempMax ?? 0,
+          tempMin: d.tempMin ?? 0,
+          precipitation: d.precipitation ?? 0,
+          windMax: d.windMax ?? 0,
+        })));
       } else {
         setError("Não foi possível carregar os dados meteorológicos");
       }
@@ -244,12 +257,10 @@ export default function Dashboard() {
                     </TabsContent>
                   </Tabs>
 
-                  {/* INMET Station Data */}
-                  <InmetDataPanel 
-                    latitude={selectedLocation.latitude} 
-                    longitude={selectedLocation.longitude} 
-                  />
-
+                  {/* Weather Sources & Confidence */}
+                  {unifiedResult && (
+                    <WeatherSourceBadge sourceInfo={unifiedResult.sourceInfo} />
+                  )}
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
