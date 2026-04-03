@@ -268,10 +268,6 @@ export default function Dashboard() {
                     </TabsContent>
                   </Tabs>
 
-                  {/* Weather Sources & Confidence */}
-                  {unifiedResult && (
-                    <WeatherSourceBadge sourceInfo={unifiedResult.sourceInfo} />
-                  )}
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
