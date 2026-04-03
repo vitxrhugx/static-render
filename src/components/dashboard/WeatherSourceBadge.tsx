@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { Radio, Satellite, MapPin, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import { Radio, Satellite, MapPin, CheckCircle2, AlertCircle, Globe, Sun } from "lucide-react";
 import type { SourceInfo, ConfidenceLevel } from "@/lib/unified-weather";
 import {
   Tooltip,
@@ -19,9 +19,50 @@ const confidenceConfig: Record<ConfidenceLevel, { label: string; dotClass: strin
   low: { label: "Confiança limitada", dotClass: "bg-orange-500", bgClass: "bg-orange-500/10 border-orange-500/20", textClass: "text-orange-700 dark:text-orange-400" },
 };
 
+interface SourceItem {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  tooltip: string;
+}
+
 export function WeatherSourceBadge({ sourceInfo, className }: WeatherSourceBadgeProps) {
   const conf = confidenceConfig[sourceInfo.confidence];
   const hasDivergences = sourceInfo.divergences.length > 0;
+
+  const sources: SourceItem[] = [
+    {
+      key: "openmeteo",
+      label: "Satélite",
+      icon: <Satellite className="w-3 h-3" />,
+      active: sourceInfo.hasOpenMeteo,
+      tooltip: "Open-Meteo — Dados de modelo/satélite (GFS, ECMWF, ERA5)",
+    },
+    {
+      key: "inmet",
+      label: "INMET",
+      icon: <Radio className="w-3 h-3" />,
+      active: sourceInfo.hasInmet,
+      tooltip: sourceInfo.hasInmet
+        ? `Estação ${sourceInfo.inmetStation} — ${sourceInfo.inmetDistance}km`
+        : "Sem estação INMET próxima disponível",
+    },
+    {
+      key: "nasa",
+      label: "NASA",
+      icon: <Globe className="w-3 h-3" />,
+      active: sourceInfo.hasNasaPower,
+      tooltip: "NASA POWER — Radiação solar, temperatura e precipitação global",
+    },
+    {
+      key: "cptec",
+      label: "CPTEC",
+      icon: <Sun className="w-3 h-3" />,
+      active: sourceInfo.hasCptec,
+      tooltip: "CPTEC/INPE — Previsão meteorológica nacional brasileira",
+    },
+  ];
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -39,56 +80,38 @@ export function WeatherSourceBadge({ sourceInfo, className }: WeatherSourceBadge
           </TooltipTrigger>
           <TooltipContent side="bottom" className="max-w-xs">
             <p className="text-xs">
-              {sourceInfo.confidence === "high" && "Estação INMET próxima (≤30km) validando dados de satélite. Máxima precisão."}
-              {sourceInfo.confidence === "medium" && "Dados cruzados entre satélite e estação física. Boa precisão com possíveis variações locais."}
-              {sourceInfo.confidence === "low" && "Apenas dados de modelo/satélite disponíveis. Sem validação de estação terrestre."}
+              {sourceInfo.activeSources} fonte{sourceInfo.activeSources !== 1 ? "s" : ""} ativa{sourceInfo.activeSources !== 1 ? "s" : ""}.{" "}
+              {sourceInfo.confidence === "high" && "Múltiplas fontes cruzadas com estação terrestre próxima."}
+              {sourceInfo.confidence === "medium" && "Dados cruzados entre fontes. Boa precisão com possíveis variações locais."}
+              {sourceInfo.confidence === "low" && "Poucas fontes disponíveis. Precisão limitada."}
             </p>
           </TooltipContent>
         </Tooltip>
 
         {/* Source indicators */}
         <div className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={cn(
-                "inline-flex items-center gap-1 px-2 py-1 rounded-md border cursor-default transition-colors",
-                sourceInfo.hasOpenMeteo
-                  ? "border-border bg-muted/40 text-foreground"
-                  : "border-border/50 bg-muted/20 text-muted-foreground/50"
-              )}>
-                <Satellite className="w-3 h-3" />
-                <span className="font-medium">Satélite</span>
-                {sourceInfo.hasOpenMeteo && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p className="text-xs">Open-Meteo — Dados de modelo/satélite com cobertura global</p>
-            </TooltipContent>
-          </Tooltip>
-
-          <span className="text-muted-foreground/40">+</span>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className={cn(
-                "inline-flex items-center gap-1 px-2 py-1 rounded-md border cursor-default transition-colors",
-                sourceInfo.hasInmet
-                  ? "border-border bg-muted/40 text-foreground"
-                  : "border-border/50 bg-muted/20 text-muted-foreground/50"
-              )}>
-                <Radio className="w-3 h-3" />
-                <span className="font-medium">INMET</span>
-                {sourceInfo.hasInmet && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" className="max-w-xs">
-              <p className="text-xs">
-                {sourceInfo.hasInmet
-                  ? `Estação ${sourceInfo.inmetStation} — ${sourceInfo.inmetDistance}km da localidade`
-                  : "Sem estação INMET próxima disponível"}
-              </p>
-            </TooltipContent>
-          </Tooltip>
+          {sources.map((src, i) => (
+            <div key={src.key} className="inline-flex items-center gap-1">
+              {i > 0 && <span className="text-muted-foreground/30">·</span>}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "inline-flex items-center gap-1 px-2 py-1 rounded-md border cursor-default transition-colors",
+                    src.active
+                      ? "border-border bg-muted/40 text-foreground"
+                      : "border-border/50 bg-muted/20 text-muted-foreground/40"
+                  )}>
+                    {src.icon}
+                    <span className="font-medium">{src.label}</span>
+                    {src.active && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p className="text-xs">{src.tooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ))}
         </div>
 
         {/* Station distance */}
@@ -131,7 +154,7 @@ export function WeatherSourceBadge({ sourceInfo, className }: WeatherSourceBadge
           </Tooltip>
         )}
 
-        {!hasDivergences && sourceInfo.hasInmet && sourceInfo.hasOpenMeteo && (
+        {!hasDivergences && sourceInfo.activeSources >= 2 && (
           <div className="inline-flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Fontes consistentes</span>
