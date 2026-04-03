@@ -162,12 +162,23 @@ export default function Dashboard() {
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <MapPin className="w-4 h-4" />
                       <span className="text-sm">
-                        {selectedLocation.latitude.toFixed(4)}, {selectedLocation.longitude.toFixed(4)}
+                        {selectedLocation.latitude.toFixed(5)}, {selectedLocation.longitude.toFixed(5)}
                       </span>
+                      {selectedLocation.address && (
+                        <span className="text-xs text-muted-foreground/70 hidden sm:inline">
+                          — {selectedLocation.address}
+                        </span>
+                      )}
                     </div>
                     <h1 className="text-2xl md:text-3xl font-display font-bold">
                       {selectedLocation.name}{selectedLocation.state ? `, ${selectedLocation.state}` : ''}
                     </h1>
+                    {/* Weather Sources Indicator */}
+                    {unifiedResult && (
+                      <div className="mt-2">
+                        <WeatherSourceBadge sourceInfo={unifiedResult.sourceInfo} />
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -257,10 +268,6 @@ export default function Dashboard() {
                     </TabsContent>
                   </Tabs>
 
-                  {/* Weather Sources & Confidence */}
-                  {unifiedResult && (
-                    <WeatherSourceBadge sourceInfo={unifiedResult.sourceInfo} />
-                  )}
                   {/* Operations Map */}
                   <OperationsMap selectedLocation={selectedLocation} />
 
