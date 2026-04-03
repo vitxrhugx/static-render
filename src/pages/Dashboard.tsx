@@ -104,7 +104,12 @@ export default function Dashboard() {
 
       // Fetch unified weather data and forecast in parallel
       const [unified, forecast] = await Promise.all([
-        getUnifiedWeatherData(selectedLocation.latitude, selectedLocation.longitude),
+        getUnifiedWeatherData(
+          selectedLocation.latitude,
+          selectedLocation.longitude,
+          selectedLocation.name,
+          selectedLocation.state
+        ),
         getWeatherForecast(selectedLocation.latitude, selectedLocation.longitude),
       ]);
 
