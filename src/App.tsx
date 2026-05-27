@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import DemoDashboard from "./pages/DemoDashboard";
 import OrganizationSettings from "./pages/OrganizationSettings";
 import NotFound from "./pages/NotFound";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -26,6 +27,8 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
+          <Route path="/demo" element={<DemoDashboard />} />
+
           <Route 
             path="/dashboard" 
             element={

@@ -31,6 +31,8 @@ const demoKPIs: KPIData = {
   impactPercentage: 58,
   completionRate: 87,
   potentialSavings: 47500,
+  productivityRecovered: 94,
+  weatherCancellationRate: 58,
 };
 
 const today = new Date();
@@ -119,7 +121,7 @@ export default function DemoDashboard() {
 
           <WeatherAlerts
             forecastData={demoForecast}
-            severityFilter={{ critical: true, warning: true, normal: true }}
+            severityFilter={{ critical: true, warning: true }}
             thresholds={demoThresholds}
           />
 
